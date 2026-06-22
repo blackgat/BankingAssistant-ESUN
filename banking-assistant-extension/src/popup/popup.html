@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>轉帳輔助</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <header>
+      <h1>轉帳批次</h1>
+      <div id="bankStatus" class="status muted">檢查分頁中…</div>
+    </header>
+
+    <section class="card">
+      <h2>新增一筆</h2>
+      <label>來源帳戶
+        <select id="sourceSelect"></select>
+      </label>
+      <label>目的帳戶（約定）
+        <select id="payeeSelect"></select>
+      </label>
+      <div class="grid2">
+        <label>金額 (TWD)
+          <input id="amount" type="number" min="1" step="1" inputmode="numeric" />
+        </label>
+        <label>預期日期 (選填)
+          <input id="expectedDate" type="date" />
+        </label>
+      </div>
+      <label>備註給自己（摘要）
+        <input id="memoShort" type="text" />
+      </label>
+      <label>備註給對方（附言）
+        <input id="memoLong" type="text" />
+      </label>
+      <button id="addJob" class="primary">加入批次</button>
+      <p id="addError" class="err" hidden></p>
+    </section>
+
+    <section class="card">
+      <div class="rowbetween">
+        <h2>批次內容（<span id="jobCount">0</span> 筆）</h2>
+        <span class="muted">總額 <span id="jobTotal">NT$ 0</span></span>
+      </div>
+      <ol id="jobList" class="joblist"></ol>
+      <div class="actions">
+        <button id="startBatch" class="primary" disabled>開始批次</button>
+        <button id="clearJobs" class="ghost">清空</button>
+      </div>
+      <p id="runStatus" class="status" hidden></p>
+    </section>
+
+    <section class="card">
+      <h2>開發測試</h2>
+      <button id="testFill" class="ghost">測試填表(不送出)</button>
+      <p class="muted" style="font-size:11px;margin-top:6px;">在銀行「資料編輯」轉帳表單頁,用設定中第一個來源 / 約定帳戶填入金額 1 與測試備註。不會按下一步、送出或 OTP。看完請按表單的「重設」。</p>
+      <pre id="testFillResult" class="status" hidden style="white-space:pre-wrap;font-size:11px;"></pre>
+    </section>
+
+    <section class="card">
+      <h2>JSON 匯入 / 匯出</h2>
+      <textarea id="jsonArea" rows="4" placeholder='貼上 TransferBatch JSON，例如 {"batchId":"...","jobs":[...]}'></textarea>
+      <div class="actions">
+        <button id="importJson" class="ghost">匯入 JSON</button>
+        <button id="exportJson" class="ghost">匯出目前批次</button>
+      </div>
+      <p id="jsonError" class="err" hidden></p>
+    </section>
+
+    <footer>
+      <a href="#" id="openOptions">設定（帳戶 / 約定 / 限額）</a>
+      <p class="disclaimer">本工具不會輸入 OTP，也不會按下最終確認。每筆轉帳由你本人在銀行頁面授權。</p>
+    </footer>
+
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>

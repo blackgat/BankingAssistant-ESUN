@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>轉帳輔助 Demo Harness</title>
+    <style>
+      body {
+        margin: 0;
+        font-family: system-ui, "Microsoft JhengHei", sans-serif;
+        background: #eef1f4;
+        color: #1a1a1a;
+      }
+      header {
+        background: #0b5d3b;
+        color: #fff;
+        padding: 12px 20px;
+      }
+      header h1 { font-size: 16px; margin: 0; }
+      header p { margin: 4px 0 0; font-size: 12px; opacity: 0.85; }
+      .bar {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        padding: 12px 20px;
+        background: #fff;
+        border-bottom: 1px solid #e4e7ec;
+        flex-wrap: wrap;
+      }
+      button {
+        font: inherit;
+        padding: 8px 14px;
+        border-radius: 8px;
+        border: 1px solid #d0d5dd;
+        background: #fff;
+        cursor: pointer;
+      }
+      button.primary { background: #0b5d3b; border-color: #0b5d3b; color: #fff; }
+      .hint { font-size: 12px; color: #667085; }
+      main { display: grid; grid-template-columns: 1fr; gap: 16px; padding: 20px; max-width: 760px; }
+      .panel { background: #fff; border: 1px solid #e4e7ec; border-radius: 12px; padding: 16px; }
+      .panel h2 { font-size: 13px; color: #667085; margin: 0 0 10px; }
+      #bank-page { min-height: 200px; }
+      #bank-page select, #bank-page input { padding: 6px 8px; margin: 4px 0; }
+      #bank-page .account-row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px dashed #e4e7ec; }
+      #bank-page .verification-summary .row, #bank-page .transfer-result .row { display: flex; justify-content: space-between; padding: 3px 0; }
+      #bank-page button { background: #b3261e; color: #fff; border-color: #b3261e; }
+      pre#audit { background: #0b1021; color: #b7e4c7; padding: 12px; border-radius: 10px; font-size: 11px; max-height: 240px; overflow: auto; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>轉帳輔助 Demo Harness</h1>
+      <p>這是離線模擬，左側是「假銀行頁」。Extension 會填表並停在驗證頁，由你（人類）按下銀行的「確認轉出」，才會偵測到完成頁。</p>
+    </header>
+
+    <div class="bar">
+      <button id="reset">載入首頁</button>
+      <button id="start" class="primary">開始批次（2 筆）</button>
+      <span class="hint">填表後請在左側「假銀行頁」按紅色「確認轉出」以模擬你本人的授權。</span>
+    </div>
+
+    <main>
+      <section class="panel">
+        <h2>模擬銀行頁面（adapter 操作對象）</h2>
+        <div id="bank-page">載入中…</div>
+      </section>
+      <section class="panel">
+        <h2>稽核紀錄（sanitized）</h2>
+        <pre id="audit">（尚無）</pre>
+      </section>
+    </main>
+
+    <script type="module" src="harness.js"></script>
+  </body>
+</html>

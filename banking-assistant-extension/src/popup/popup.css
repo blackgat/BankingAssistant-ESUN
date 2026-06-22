@@ -1,0 +1,67 @@
+:root {
+  --green: #0b5d3b;
+  --green-2: #0a7a4d;
+  --ink: #1a1a1a;
+  --muted: #667085;
+  --line: #e4e7ec;
+  --err: #8a1c1c;
+  --bg-soft: #f2f4f7;
+}
+* { box-sizing: border-box; }
+body {
+  width: 360px;
+  margin: 0;
+  padding: 12px;
+  font-family: system-ui, -apple-system, "Segoe UI", "Microsoft JhengHei", sans-serif;
+  font-size: 13px;
+  color: var(--ink);
+  background: #fff;
+}
+header { margin-bottom: 10px; }
+h1 { font-size: 16px; margin: 0 0 4px; color: var(--green); }
+h2 { font-size: 13px; margin: 0 0 8px; }
+.muted { color: var(--muted); }
+.status { font-size: 12px; }
+.status.ok { color: var(--green); }
+.status.err { color: var(--err); }
+.card {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px;
+  margin-bottom: 10px;
+}
+label { display: block; margin-bottom: 8px; font-size: 12px; color: var(--muted); }
+input, select, textarea {
+  width: 100%;
+  font: inherit;
+  color: var(--ink);
+  margin-top: 3px;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+textarea { resize: vertical; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.rowbetween { display: flex; align-items: baseline; justify-content: space-between; }
+.actions { display: flex; gap: 8px; margin-top: 8px; }
+button {
+  font: inherit;
+  padding: 7px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: #fff;
+  cursor: pointer;
+}
+button.primary { background: var(--green); border-color: var(--green); color: #fff; }
+button.primary:disabled { opacity: 0.5; cursor: not-allowed; }
+button.ghost { background: var(--bg-soft); }
+.joblist { list-style: decimal; margin: 6px 0 0; padding-left: 20px; }
+.joblist li { padding: 4px 0; border-bottom: 1px dashed var(--line); }
+.joblist .ji { display: flex; justify-content: space-between; gap: 8px; }
+.joblist .meta { color: var(--muted); font-size: 11px; }
+.joblist button.rm { padding: 2px 8px; font-size: 11px; }
+.err { color: var(--err); font-size: 12px; margin: 6px 0 0; }
+footer { margin-top: 4px; }
+footer a { color: var(--green-2); font-size: 12px; }
+.disclaimer { color: var(--muted); font-size: 11px; margin: 8px 0 0; }

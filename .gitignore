@@ -1,0 +1,10 @@
+# Dependencies (also covered by banking-assistant-extension/.gitignore)
+node_modules/
+
+# Claude Code local, machine-specific settings
+.claude/settings.local.json
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+*.log

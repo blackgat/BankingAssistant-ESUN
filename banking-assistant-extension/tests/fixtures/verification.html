@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8" />
+    <title>玉山銀行 轉帳確認</title>
+  </head>
+  <body>
+    <main>
+      <h1>請確認轉帳資料</h1>
+      <!-- The verification summary the extension reads (sanitized values only). -->
+      <section class="verification-summary">
+        <div class="row"><span>轉出帳號</span><span data-field="source-last5">****12345</span></div>
+        <div class="row"><span>收款人</span><span data-field="payee-name">張三</span></div>
+        <div class="row"><span>轉入帳號</span><span data-field="dest-last5">****67890</span></div>
+        <div class="row"><span>金額</span><span data-field="amount">NT$ 3,000</span></div>
+        <div class="row"><span>摘要</span><span data-field="memo-short">家用</span></div>
+        <div class="row"><span>附言</span><span data-field="memo-long">2026-06 家用</span></div>
+      </section>
+
+      <!--
+        The following are the bank's own OTP entry and final-confirm controls.
+        The extension MUST NOT fill the OTP or click the confirm button. There is
+        deliberately no adapter method that targets either of these.
+      -->
+      <section class="bank-final-controls">
+        <label>簡訊 OTP
+          <input id="otp" name="otp" type="text" autocomplete="one-time-code" />
+        </label>
+        <button id="confirmFinal" type="button">確認轉出</button>
+      </section>
+    </main>
+  </body>
+</html>

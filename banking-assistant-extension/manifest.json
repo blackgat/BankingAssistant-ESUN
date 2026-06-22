@@ -1,0 +1,45 @@
+{
+  "manifest_version": 3,
+  "name": "Banking Transfer Assistant (E.SUN)",
+  "version": "0.1.0",
+  "description": "Local banking transfer assistant. Does not store passwords/OTP/full account numbers. Never clicks the final transfer confirmation; the user authorizes every transfer.",
+  "minimum_chrome_version": "110",
+  "permissions": ["storage", "activeTab"],
+  "host_permissions": ["https://*.esunbank.com.tw/*"],
+  "action": {
+    "default_popup": "src/popup/popup.html",
+    "default_title": "Banking Transfer Assistant"
+  },
+  "options_page": "src/options/options.html",
+  "background": {
+    "service_worker": "src/background/service-worker.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://*.esunbank.com.tw/*"],
+      "js": ["src/content/main.js"],
+      "run_at": "document_idle",
+      "all_frames": true
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "src/content/main.module.js",
+        "src/content/overlay.js",
+        "src/content/runner.js",
+        "src/content/state-machine.js",
+        "src/content/extractors/bank-adapter.esun.js",
+        "src/content/extractors/bank-adapter.example.js",
+        "src/content/actions/transfer-form-actions.js",
+        "src/core/types.js",
+        "src/core/policy.js",
+        "src/core/sanitizer.js",
+        "src/core/allowlist.js",
+        "src/core/logger.js"
+      ],
+      "matches": ["https://*.esunbank.com.tw/*"]
+    }
+  ]
+}

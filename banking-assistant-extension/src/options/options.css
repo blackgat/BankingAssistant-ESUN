@@ -1,0 +1,49 @@
+:root {
+  --green: #0b5d3b;
+  --ink: #1a1a1a;
+  --muted: #667085;
+  --line: #e4e7ec;
+  --err: #8a1c1c;
+  --bg-soft: #f2f4f7;
+  --warn-bg: #fff6e5;
+  --warn-line: #ffe1a8;
+  --warn-ink: #7a4d00;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, "Segoe UI", "Microsoft JhengHei", sans-serif;
+  font-size: 14px;
+  color: var(--ink);
+  background: #f7f8fa;
+}
+main { max-width: 760px; margin: 0 auto; padding: 24px 16px 64px; }
+h1 { color: var(--green); font-size: 22px; }
+h2 { font-size: 15px; margin: 0; }
+.warn {
+  background: var(--warn-bg); border: 1px solid var(--warn-line); color: var(--warn-ink);
+  padding: 10px 12px; border-radius: 10px;
+}
+.card { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin: 14px 0; }
+.rowbetween { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+label { display: block; font-size: 12px; color: var(--muted); }
+input, textarea {
+  width: 100%; font: inherit; color: var(--ink); margin-top: 4px;
+  padding: 7px 9px; border: 1px solid var(--line); border-radius: 8px; background: #fff;
+}
+textarea { resize: vertical; margin-top: 10px; }
+.itemrow {
+  display: grid; grid-template-columns: repeat(2, 1fr) auto; gap: 10px;
+  padding: 10px; border: 1px dashed var(--line); border-radius: 10px; margin-bottom: 10px;
+}
+.itemrow .full { grid-column: 1 / -1; }
+.actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 8px; }
+button { font: inherit; padding: 8px 14px; border-radius: 8px; border: 1px solid var(--line); background: #fff; cursor: pointer; }
+button.primary { background: var(--green); border-color: var(--green); color: #fff; }
+button.ghost { background: var(--bg-soft); }
+button.danger { color: var(--err); border-color: #f5c2c2; }
+button.rm { color: var(--err); border-color: #f5c2c2; align-self: start; }
+.status { font-size: 12px; color: var(--muted); }
+.status.ok { color: var(--green); }
+.status.err { color: var(--err); }

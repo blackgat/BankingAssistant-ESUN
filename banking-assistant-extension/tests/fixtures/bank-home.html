@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8" />
+    <title>玉山銀行 個人網路銀行</title>
+  </head>
+  <body>
+    <header class="topbar">
+      <span class="user-greeting">您好，王嘉欽</span>
+      <a href="#logout" data-action="logout" class="ba-logout">登出</a>
+    </header>
+
+    <nav class="main-nav">
+      <a href="#home">首頁</a>
+      <a href="#transfer" data-nav="transfer" class="nav-transfer">轉帳</a>
+    </nav>
+
+    <main>
+      <h1>帳戶總覽</h1>
+      <ul class="account-list">
+        <li class="account-row" data-account-last5="12345">
+          <span class="account-name">活期存款 (末五碼 12345)</span>
+          <span class="account-balance">NT$ 50,000</span>
+        </li>
+        <li class="account-row" data-account-last5="99999">
+          <span class="account-name">綜合存款 (末五碼 99999)</span>
+          <span class="account-balance">NT$ 8,200</span>
+        </li>
+      </ul>
+    </main>
+  </body>
+</html>

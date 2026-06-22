@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "demo",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["banking-assistant-extension/scripts/serve.mjs"],
+      "port": 8123
+    }
+  ]
+}

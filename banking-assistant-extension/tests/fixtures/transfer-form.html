@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8" />
+    <title>玉山銀行 轉帳</title>
+  </head>
+  <body>
+    <header class="topbar">
+      <a href="#logout" data-action="logout" class="ba-logout">登出</a>
+    </header>
+
+    <main>
+      <h1>約定轉帳</h1>
+      <form class="transfer-form" onsubmit="return false">
+        <label>轉出帳號
+          <select class="ba-source" name="sourceAccount">
+            <option value="">請選擇</option>
+            <option value="src-12345" data-last5="12345">活期存款 ****12345</option>
+            <option value="src-99999" data-last5="99999">綜合存款 ****99999</option>
+          </select>
+        </label>
+
+        <label>轉入帳號（約定）
+          <select class="ba-payee" name="payee">
+            <option value="">請選擇</option>
+            <option value="payee-67890" data-last5="67890" data-name="張三">家用 張三 ****67890</option>
+            <option value="payee-11111" data-last5="11111" data-name="李四">房租 李四 ****11111</option>
+          </select>
+        </label>
+
+        <label>金額
+          <input class="ba-amount" name="amount" type="text" inputmode="numeric" />
+        </label>
+
+        <label>摘要
+          <input class="ba-memo-short" name="memoShort" type="text" maxlength="20" />
+        </label>
+
+        <label>附言
+          <input class="ba-memo-long" name="memoLong" type="text" maxlength="60" />
+        </label>
+
+        <button type="button" class="ba-next">下一步</button>
+      </form>
+    </main>
+  </body>
+</html>

@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>轉帳輔助 - 設定</title>
+    <link rel="stylesheet" href="options.css" />
+  </head>
+  <body>
+    <main>
+      <h1>轉帳輔助設定</h1>
+      <p class="warn">
+        本頁不會也不應該要求：銀行登入帳密、OTP seed、完整帳號。帳號只需填「遮罩末 5 碼」與顯示名稱樣式。
+      </p>
+
+      <section class="card">
+        <h2>銀行</h2>
+        <div class="grid">
+          <label>bankId <input id="bankId" type="text" /></label>
+          <label>登入後 Origin <input id="bankOrigin" type="text" placeholder="https://ebank.esunbank.com.tw" /></label>
+          <label>允許的網域字尾（逗號分隔）
+            <input id="allowedHostSuffixes" type="text" placeholder="esunbank.com.tw" />
+          </label>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="rowbetween">
+          <h2>來源帳戶</h2>
+          <button id="addSource" class="ghost">新增來源帳戶</button>
+        </div>
+        <div id="sourceList"></div>
+      </section>
+
+      <section class="card">
+        <div class="rowbetween">
+          <h2>約定目的帳戶</h2>
+          <button id="addPayee" class="ghost">新增約定帳戶</button>
+        </div>
+        <div id="payeeList"></div>
+      </section>
+
+      <section class="card">
+        <h2>行為與限額</h2>
+        <div class="grid">
+          <label>等待驗證頁逾時（秒）<input id="verificationTimeoutSec" type="number" min="5" /></label>
+          <label>等待完成頁逾時（分鐘）<input id="completionTimeoutMin" type="number" min="1" /></label>
+          <label>備註給自己（摘要）最大長度 <input id="memoShortMaxLen" type="number" min="1" /></label>
+          <label>備註給對方（附言）最大長度 <input id="memoLongMaxLen" type="number" min="1" /></label>
+          <label>單批最大筆數 <input id="maxJobsPerBatch" type="number" min="1" /></label>
+          <label>停止後自動收起 overlay（秒,0=不收起）<input id="overlayDismissSec" type="number" min="0" /></label>
+        </div>
+        <label style="margin-top:10px;display:flex;gap:8px;align-items:flex-start;">
+          <input id="requireBalanceCheck" type="checkbox" style="width:auto;margin-top:2px;" />
+          <span>轉帳前檢查來源帳戶餘額是否足夠。玉山是在轉帳表單選好轉出帳號後才顯示「可用餘額」,extension 會自己選轉出帳號來讀,所以**只要在轉帳表單頁**按開始批次即可。若你的銀行不顯示餘額,可取消勾選(單筆/單日限額與驗證頁的本人授權仍然有效)。</span>
+        </label>
+      </section>
+
+      <div class="actions">
+        <button id="save" class="primary">儲存設定</button>
+        <span id="saveStatus" class="status"></span>
+      </div>
+
+      <section class="card">
+        <h2>匯入 / 匯出 / 稽核紀錄</h2>
+        <div class="actions">
+          <button id="exportConfig" class="ghost">匯出設定 JSON</button>
+          <button id="importConfig" class="ghost">匯入設定 JSON</button>
+          <button id="downloadAudit" class="ghost">下載稽核紀錄 (JSONL)</button>
+          <button id="clearAudit" class="danger">清除稽核紀錄</button>
+        </div>
+        <textarea id="configArea" rows="6" placeholder="在此貼上設定 JSON 後按「匯入設定 JSON」"></textarea>
+        <p id="ioStatus" class="status"></p>
+      </section>
+    </main>
+    <script type="module" src="options.js"></script>
+  </body>
+</html>
