@@ -429,7 +429,10 @@ export class EsunAdapter extends BaseBankAdapter {
     }
     // 交易結果 step. The step itself is the reliable completion signal; the
     // reference number is best-effort until verified on a real completed transfer.
-    const refVal = this._confirmCellValue(/序號|交易序號|交易編號|代號|轉帳序號/) || "";
+    // Prefer specific transaction-serial labels; avoid the bare 代號 (it also
+    // matches 使用者代號). Verified 2026-07-19 on a real transfer -> a date-prefixed
+    // serial (masked e.g. 202****388).
+    const refVal = this._confirmCellValue(/交易序號|轉帳序號|交易編號|序號/) || "";
     return {
       value: {
         pageState: PAGE_STATES.COMPLETION,

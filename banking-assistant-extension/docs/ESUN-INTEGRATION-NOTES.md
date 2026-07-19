@@ -98,16 +98,17 @@ Notes:
 - The **final 確認/送出 button and the OTP (簡訊密碼)** are on THIS step and are the
   user's to perform. The extension never clicks them.
 
-## 6. 交易結果 (completion) — NOT YET MAPPED
+## 6. 交易結果 (completion) — VERIFIED (2026-07-19)
 
-- Only visible after a **real, fully-authorized transfer** completes, so it could not
-  be inspected without moving money.
-- `readCompletion()` is **best-effort**: completion is detected reliably from the
-  wizard step (`交易結果`); the reference number is read from a cell labelled
-  `序號/交易序號/交易編號/代號` — **UNVERIFIED**.
-- **TODO:** the next time you complete a real transfer, pause on the 交易結果 page and
-  capture its structure (reference-number label + format, success text) so
-  `readCompletion()` can be finalised.
+- Only appears after a **real, fully-authorized transfer** completes.
+- Verified on a real transfer: `detectPageState()` reports `completion` from the
+  wizard step (`交易結果`), and `readCompletion()` reads the transaction serial from a
+  cell labelled `交易序號 / 序號` — a **date-prefixed** number (e.g. masked `202****388`).
+- The reference label regex intentionally excludes the bare `代號` (it also matches
+  `使用者代號`).
+- Confirmed via the audit log's `completion_detected` event (`bankReferenceMasked`)
+  rather than a live DOM read, so the exact cell label was inferred. If a future
+  transfer shows a wrong/empty reference, re-check the 交易結果 page labels live.
 
 ## 7. How to re-inspect (if E.SUN changes)
 
@@ -180,4 +181,4 @@ Or use the extension itself:
 | Form fill (source/payee/amount/memos) | verified live (`dryRunFill` all ok) |
 | Submit → 資料確認 (`下一步`) | verified live |
 | Verification-page extraction | verified live |
-| Completion-page extraction (`交易結果`) | NOT verified — needs a real completed transfer |
+| Completion-page extraction (`交易結果`) | verified on a real transfer (2026-07-19) |
