@@ -247,9 +247,11 @@ export class TransferRunner {
 
       // Navigate to the transfer form and confirm we are on it.
       await adapter.navigateToTransferForm();
+      // Do NOT treat "unknown" as a hard stop: an SPA widget load transiently
+      // reports unknown between the old and new page. Poll until the form appears
+      // or we time out.
       const onForm = await this.waiter.wait({
         accept: [PAGE_STATES.TRANSFER_FORM],
-        stop: [PAGE_STATES.UNKNOWN],
         timeoutMs: config.behavior.verificationTimeoutMs,
       });
       if (onForm.outcome !== "accepted") {
@@ -283,7 +285,6 @@ export class TransferRunner {
       await adapter.submitFormToVerificationPage();
       const verifWait = await this.waiter.wait({
         accept: [PAGE_STATES.VERIFICATION],
-        stop: [PAGE_STATES.COMPLETION, PAGE_STATES.UNKNOWN],
         timeoutMs: config.behavior.verificationTimeoutMs,
       });
       if (verifWait.outcome !== "accepted") {
@@ -318,7 +319,6 @@ export class TransferRunner {
 
       const completeWait = await this.waiter.wait({
         accept: [PAGE_STATES.COMPLETION],
-        stop: [PAGE_STATES.UNKNOWN],
         timeoutMs: config.behavior.completionTimeoutMs,
       });
       if (completeWait.outcome !== "accepted") {
