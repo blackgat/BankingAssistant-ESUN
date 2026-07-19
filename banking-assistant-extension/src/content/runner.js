@@ -376,11 +376,18 @@ export class TransferRunner {
       currency: finalBalance?.currency,
     });
 
-    // Assist logout; if it needs confirmation, stop and ask the user.
-    const logout = await adapter.logout();
+    // Assist logout if enabled; otherwise leave the session open for the user
+    // (e.g. to review the completion page). SPEC section 2 lists logout as the
+    // final step, so this defaults on.
     this.batchMachine.send(BATCH_EVENTS.LOGOUT_REQUESTED);
-    overlay.showLogout(logout);
-    await this._audit(A.LOGOUT_CLICKED, { message: logout.message });
+    if (config.behavior?.autoLogout !== false) {
+      const logout = await adapter.logout();
+      overlay.showLogout(logout);
+      await this._audit(A.LOGOUT_CLICKED, { message: logout.message });
+    } else {
+      overlay.showLogout({ ok: true, skipped: true, message: "auto-logout off" });
+      await this._audit(A.LOGOUT_CLICKED, { message: "auto-logout disabled; session left to user" });
+    }
 
     return { results: this.results, stopped: false };
   }

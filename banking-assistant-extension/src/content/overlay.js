@@ -242,6 +242,16 @@ export class Overlay {
   }
 
   showLogout(logout) {
+    if (logout?.skipped) {
+      this._render(
+        [
+          el("div", { class: "banner ok", text: "批次完成" }),
+          el("div", { class: "note", text: "自動登出已關閉，請自行登出銀行網站。" }),
+        ],
+        "完成",
+      );
+      return;
+    }
     const nodes = [el("div", { class: "banner ok", text: "已協助點擊登出" })];
     if (logout?.requiresUserConfirm) {
       nodes.push(el("div", { class: "banner wait", text: "登出需要你在銀行頁面再次確認，請手動完成。" }));

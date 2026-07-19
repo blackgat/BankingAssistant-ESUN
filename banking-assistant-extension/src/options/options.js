@@ -100,6 +100,7 @@ function render() {
   $("maxJobsPerBatch").value = config.globalLimits?.maxJobsPerBatch ?? 20;
   $("overlayDismissSec").value = Math.round((config.behavior?.overlayDismissMs ?? 3000) / 1000);
   $("requireBalanceCheck").checked = config.behavior?.requireBalanceCheck !== false;
+  $("autoLogout").checked = config.behavior?.autoLogout !== false;
 
   const sl = $("sourceList");
   const pl = $("payeeList");
@@ -128,6 +129,7 @@ function gather() {
       memoShortMaxLen: Number($("memoShortMaxLen").value) || 20,
       memoLongMaxLen: Number($("memoLongMaxLen").value) || 60,
       requireBalanceCheck: $("requireBalanceCheck").checked,
+      autoLogout: $("autoLogout").checked,
       overlayDismissMs: (() => {
         const sec = Number($("overlayDismissSec").value);
         return (Number.isFinite(sec) && sec >= 0 ? sec : 3) * 1000;

@@ -135,6 +135,9 @@ export const DEFAULT_CONFIG = Object.freeze({
     // How long the overlay stays visible after "停止批次" before auto-closing.
     // 0 disables auto-close (the overlay stays until the page navigates/reloads).
     overlayDismissMs: 3000,
+    // Click logout automatically after the whole batch completes (SPEC section 2).
+    // Turn off to keep the session open (e.g. to review the 交易結果 page).
+    autoLogout: true,
   },
 });
 

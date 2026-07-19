@@ -54,6 +54,10 @@
           <input id="requireBalanceCheck" type="checkbox" style="width:auto;margin-top:2px;" />
           <span>轉帳前檢查來源帳戶餘額是否足夠。玉山是在轉帳表單選好轉出帳號後才顯示「可用餘額」,extension 會自己選轉出帳號來讀,所以**只要在轉帳表單頁**按開始批次即可。若你的銀行不顯示餘額,可取消勾選(單筆/單日限額與驗證頁的本人授權仍然有效)。</span>
         </label>
+        <label style="margin-top:10px;display:flex;gap:8px;align-items:flex-start;">
+          <input id="autoLogout" type="checkbox" style="width:auto;margin-top:2px;" />
+          <span>整批完成後自動點擊登出（SPEC 預設行為）。取消勾選則保留登入狀態、只顯示「請自行登出」——想停在交易結果頁檢視時可關掉。</span>
+        </label>
       </section>
 
       <div class="actions">
