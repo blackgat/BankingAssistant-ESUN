@@ -182,3 +182,17 @@ Or use the extension itself:
 | Submit → 資料確認 (`下一步`) | verified live |
 | Verification-page extraction | verified live |
 | Completion-page extraction (`交易結果`) | verified on a real transfer (2026-07-19) |
+
+## 10. Known limitations / TODO
+
+- **`readBalance` requires being on the transfer form before starting a batch.**
+  E.SUN shows `可用餘額` only on the 資料編輯 form (after a 轉出帳號 is selected), and the
+  runner reads the balance at step 2 *before* it navigates. If a batch is started from
+  another page (e.g. the account dashboard), the read falls through to the generic
+  account-row reader and fails with `account_not_found` / confidence 0. **Workaround:**
+  open the 即時 / 預約轉帳 form before pressing 開始批次.
+  **TODO** (does *not* need a real transfer to implement or test — the form page is
+  enough): make `EsunAdapter.readBalance` navigate to the transfer form itself (click
+  即時 / 預約轉帳) when the source `<select>` is absent, wait for it to load, then select
+  the source and read `可用餘額`. Deferred until real-transfer functionality testing is
+  complete, per request.
