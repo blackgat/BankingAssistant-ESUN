@@ -89,7 +89,7 @@ export class Overlay {
     const cancelBtn = el("button", { class: "danger", type: "button", text: "停止批次" });
     cancelBtn.addEventListener("click", () => {
       if (this._onCancel) this._onCancel(); // trigger the stop/abort action
-      this._scheduleDismiss(); // keep status visible for the configured delay, then close
+      this.scheduleDismiss(); // keep status visible for the configured delay, then close
     });
     ft.appendChild(cancelBtn);
     wrap.append(hd, this.body, ft);
@@ -101,11 +101,15 @@ export class Overlay {
     this._onCancel = cb;
   }
 
-  /** After a stop is requested, leave the status visible briefly, then close. */
-  _scheduleDismiss(ms) {
+  /** After a stop or completion, leave the status visible briefly, then close. */
+  scheduleDismiss(ms) {
     const delay = ms ?? this._dismissMs;
     if (this._destroyTimer || this._destroyed || !(delay > 0)) return;
     this._destroyTimer = setTimeout(() => this.destroy(), delay);
+    // Don't let the pending close keep a Node test process alive (no-op in browsers).
+    if (this._destroyTimer && typeof this._destroyTimer.unref === "function") {
+      this._destroyTimer.unref();
+    }
   }
 
   _phase(text) {

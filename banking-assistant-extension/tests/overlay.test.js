@@ -54,6 +54,23 @@ test("auto-dismiss delay is configurable and 0 disables it", () => {
   }
 });
 
+test("scheduleDismiss closes the overlay after a completed batch too", () => {
+  const doc = loadDom("<!DOCTYPE html><html><body></body></html>");
+  mock.timers.enable({ apis: ["setTimeout"] });
+  try {
+    const o = new Overlay({ mountTo: doc.body, dismissMs: 3000 });
+    o.showBatchCompleted(null, [{ jobId: "j1", status: "completed" }]);
+    assert.ok(hostEl(doc), "visible while showing the completed status");
+    o.scheduleDismiss(); // what the runner calls at the end of a batch
+    mock.timers.tick(2999);
+    assert.ok(hostEl(doc), "still visible just before the delay elapses");
+    mock.timers.tick(1);
+    assert.equal(hostEl(doc), null, "closed after the delay");
+  } finally {
+    mock.timers.reset();
+  }
+});
+
 test("a destroyed overlay does not resurrect itself on a late render", () => {
   const doc = loadDom("<!DOCTYPE html><html><body></body></html>");
   const overlay = new Overlay({ mountTo: doc.body });

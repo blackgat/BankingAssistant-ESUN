@@ -389,6 +389,10 @@ export class TransferRunner {
       await this._audit(A.LOGOUT_CLICKED, { message: "auto-logout disabled; session left to user" });
     }
 
+    // The batch is done and the final status has been rendered; close the overlay
+    // after the configured delay so it stops covering the bank page.
+    if (typeof overlay.scheduleDismiss === "function") overlay.scheduleDismiss();
+
     return { results: this.results, stopped: false };
   }
 
