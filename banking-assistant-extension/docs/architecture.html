@@ -70,6 +70,13 @@
   .fig svg { display: block; margin: 0 auto; max-width: 100%; height: auto; }
   .fig .mermaid { display: flex; justify-content: center; }
   .fig .mermaid svg { min-width: 0; }
+  /* mermaid emits `#mermaid-<id> .actor { fill: <actorBkg> }`, which applies to
+     the participant BOX and its LABEL TEXT alike — so the labels render in the
+     box's own background colour and vanish. That rule is ID-scoped, so only
+     !important can override it. The white sequence numbers sit on dark circles
+     and are intentionally left alone. */
+  .fig .mermaid svg text.actor,
+  .fig .mermaid svg text.actor tspan { fill: #161D1A !important; }
 
   * { box-sizing: border-box; }
 
@@ -166,6 +173,7 @@
     </p>
     <div class="fig">
       <pre class="mermaid">
+%%{init: {'theme':'base','themeVariables':{'fontFamily':'Noto Sans TC, sans-serif','primaryColor':'#E2EFEA','primaryTextColor':'#161D1A','primaryBorderColor':'#0F5D4A','secondaryColor':'#F7EEDC','tertiaryColor':'#FFFFFF','lineColor':'#3F4A45','textColor':'#161D1A','mainBkg':'#E2EFEA','nodeBorder':'#0F5D4A','clusterBkg':'#FFFFFF','clusterBorder':'#C8D3CD','edgeLabelBackground':'#FAFBFA','titleColor':'#161D1A'}}}%%
 flowchart TB
   subgraph UI["你操作的介面"]
     P["Popup<br/>轉帳清單"]
@@ -263,6 +271,7 @@ flowchart TB
     </p>
     <div class="fig">
       <pre class="mermaid">
+%%{init: {'theme':'base','themeVariables':{'fontFamily':'Noto Sans TC, sans-serif','textColor':'#161D1A','actorBkg':'#E2EFEA','actorBorder':'#0F5D4A','actorTextColor':'#161D1A','actorLineColor':'#5A6863','signalColor':'#2F3A35','signalTextColor':'#161D1A','labelBoxBkgColor':'#E2EFEA','labelBoxBorderColor':'#0F5D4A','labelTextColor':'#161D1A','noteBkgColor':'#F7EEDC','noteBorderColor':'#8A6414','noteTextColor':'#161D1A','sequenceNumberColor':'#FFFFFF','lineColor':'#2F3A35','primaryColor':'#E2EFEA','primaryBorderColor':'#0F5D4A','primaryTextColor':'#161D1A'}}}%%
 sequenceDiagram
   autonumber
   actor U as 你
@@ -295,6 +304,7 @@ sequenceDiagram
     </p>
     <div class="fig">
       <pre class="mermaid">
+%%{init: {'theme':'base','themeVariables':{'fontFamily':'Noto Sans TC, sans-serif','textColor':'#161D1A','primaryColor':'#E2EFEA','primaryTextColor':'#161D1A','primaryBorderColor':'#0F5D4A','lineColor':'#3F4A45','transitionColor':'#3F4A45','transitionLabelColor':'#161D1A','stateBkg':'#E2EFEA','stateBorder':'#0F5D4A','labelColor':'#161D1A','altBackground':'#FFFFFF','compositeBackground':'#FFFFFF','compositeBorder':'#C8D3CD','edgeLabelBackground':'#FAFBFA','nodeBorder':'#0F5D4A','mainBkg':'#E2EFEA'}}}%%
 stateDiagram-v2
   direction LR
   [*] --> 待處理
@@ -322,6 +332,7 @@ stateDiagram-v2
     </p>
     <div class="fig">
       <pre class="mermaid">
+%%{init: {'theme':'base','themeVariables':{'fontFamily':'Noto Sans TC, sans-serif','primaryColor':'#E2EFEA','primaryTextColor':'#161D1A','primaryBorderColor':'#0F5D4A','secondaryColor':'#F7EEDC','tertiaryColor':'#FFFFFF','lineColor':'#3F4A45','textColor':'#161D1A','mainBkg':'#E2EFEA','nodeBorder':'#0F5D4A','edgeLabelBackground':'#FAFBFA'}}}%%
 flowchart LR
   S["讀步驟指示器<br/>.step .current"] --> A{"文字是？"}
   A -- "資料編輯" --> F["transfer_form"]
@@ -398,6 +409,7 @@ flowchart LR
     </p>
     <div class="fig">
       <pre class="mermaid">
+%%{init: {'theme':'base','themeVariables':{'fontFamily':'Noto Sans TC, sans-serif','primaryColor':'#E2EFEA','primaryTextColor':'#161D1A','primaryBorderColor':'#0F5D4A','secondaryColor':'#F7EEDC','tertiaryColor':'#FFFFFF','lineColor':'#3F4A45','textColor':'#161D1A','mainBkg':'#E2EFEA','nodeBorder':'#0F5D4A','edgeLabelBackground':'#FAFBFA'}}}%%
 flowchart LR
   D[("銀行頁面 DOM")] --> AD["Adapter 擷取"]
   AD --> SA["sanitizer<br/>遮罩與過濾"]
