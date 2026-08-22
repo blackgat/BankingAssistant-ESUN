@@ -251,7 +251,7 @@ flowchart TB
           <text x="476" y="244" font-weight="500" fill="#A63D2F">✕</text><text x="500" y="244">確認登出對話框</text>
         </g>
         <text x="466" y="285" font-family="Noto Sans TC, sans-serif" font-size="12.5" fill="#A63D2F">
-          這些名稱在 FORBIDDEN_ACTIONS，呼叫即丟出例外。
+          白名單之外一律丟出例外；最終確認與 OTP 另被明確列為禁止。
         </text>
       </svg>
     </div>
@@ -353,7 +353,7 @@ flowchart LR
     <h2>三道關卡</h2>
     <p>
       全部是純函式：同樣的輸入永遠得到同樣的判斷，不呼叫任何模型、不連網路。
-      任何一關不過就停止整批，不會「跳過這筆繼續跑」。
+      失敗的後果分兩種 —— ① 與 ③ 停止整批，② 只略過那一筆並繼續跑下一筆。
     </p>
     <div class="fig">
       <svg viewBox="0 0 860 250" role="img" aria-labelledby="f6t f6d">
@@ -392,8 +392,8 @@ flowchart LR
 
         <g>
           <rect x="14" y="168" width="832" height="60" rx="10" fill="#F7E7E4" stroke="#A63D2F" stroke-width="1.5"/>
-          <text x="34" y="194" font-family="Noto Sans TC, sans-serif" font-size="14" font-weight="500" fill="#A63D2F">任何一關不通過 → 停止整批、顯示紅色 overlay、不進入下一筆</text>
-          <text x="34" y="216" font-family="Noto Sans TC, sans-serif" font-size="12.5" fill="#47534E">讀取信心低於 0.9、或有多個帳戶同時符合，也一律停止（fail closed）</text>
+          <text x="34" y="194" font-family="Noto Sans TC, sans-serif" font-size="14" font-weight="500" fill="#A63D2F">① 或 ③ 不通過 → 停止整批、不進入下一筆　｜　② 不通過 → 略過那一筆，繼續下一筆</text>
+          <text x="34" y="216" font-family="Noto Sans TC, sans-serif" font-size="12.5" fill="#47534E">讀取信心低於 0.9、或有多個帳戶同時符合，也一律停止整批（fail closed）</text>
         </g>
       </svg>
     </div>

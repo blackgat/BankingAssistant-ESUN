@@ -1,13 +1,16 @@
 // E.SUN (玉山銀行) adapter.
 //
 // =====================================================================
-//  REPLACE-ME: the selectors below are placeholders that match the demo
-//  fixtures (tests/fixtures/*.html). They are NOT verified against E.SUN's
-//  real online-banking DOM, which sits behind login and is not inspectable
-//  from here. Before using on https://*.esunbank.com.tw, open each real page
-//  (home / transfer form / verification / completion), inspect the DOM, and
-//  update the right-hand selector strings. Update the fixtures to match too,
-//  then run `npm test`. See README "替換銀行 selector".
+//  These selectors were checked against the real E.SUN online banking DOM
+//  (2026-07-19) — login marker, wizard steps, transfer-form labels, mode
+//  radios, 可用餘額, the 資料確認 table, and the 交易結果 serial. The DOM notes
+//  and re-inspection snippets live in docs/ESUN-INTEGRATION-NOTES.md.
+//
+//  The `pages`/`accounts` groups still describe the demo fixtures
+//  (tests/fixtures/*.html): they only serve as the fallback scorer for pages
+//  without a wizard step. If E.SUN redesigns, re-inspect each page, update the
+//  right-hand strings here, update the fixtures to match, and run `npm test`.
+//  See README "替換銀行 selector".
 // =====================================================================
 
 import { PAGE_STATES, CURRENCY } from "../../core/types.js";

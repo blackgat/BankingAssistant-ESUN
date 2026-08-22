@@ -71,8 +71,11 @@ Notes:
   It still requires being on the transfer form; otherwise it fails closed (or turn the
   check off via `behavior.requireBalanceCheck`).
 - **Multiple `轉入帳號` selects** exist (約定 list, 玉山 行內, 他行 manual). The adapter
-  picks the one whose options actually contain the configured payee
-  (`_trySelectPayee`); if none does, it clicks 約定常用帳號 and retries.
+  clicks 約定常用帳號 **first** so the designated dropdown is the live 轉入帳號 input,
+  then calls `_trySelectPayee`, which scans those selects for one whose options match
+  the configured payee. Because the radio click can re-render the dropdown over AJAX,
+  a failed first attempt is retried for ~1 s (8 × 120 ms) before falling back to the
+  generic selector path.
 
 ## 5. 資料確認 (verification) — table layout
 
@@ -94,7 +97,11 @@ Notes:
   in policy.js; `parseAmount` also NFKC-normalizes). Don't switch these back to exact
   string equality.
 - `readVerificationSummary()` extracts: payee name (text before `約定`/`(`), payee
-  last-5 (digits in the cell), amount. Source last-5 is **not shown** on this page.
+  last-5 (digits in the cell), amount, **both memos** (`/給自己|摘要/` and
+  `/給對方|附言/`), and source last-5 from the 轉出帳號 cell when present.
+  The memos are load-bearing: whenever the confirm page shows them they feed
+  `memo_short_match` / `memo_long_match` in `policy.js`, so a memo that doesn't match
+  the job stops the batch. This is why the NFKC normalization below matters.
 - The **final 確認/送出 button and the OTP (簡訊密碼)** are on THIS step and are the
   user's to perform. The extension never clicks them.
 
@@ -158,8 +165,8 @@ Or use the extension itself:
 
 - [`manifest.json`](../manifest.json) — `all_frames`, `host_permissions: https://*.esunbank.com.tw/*`.
 - [`bank-adapter.esun.js`](../src/content/extractors/bank-adapter.esun.js) — `ESUN_SELECTORS`
-  (`login`, `wizard`, `form`, `labels`, `modes`, `verification`, `completion`,
-  `accounts`, `payees`) and the `EsunAdapter` overrides:
+  (`login`, `pages`, `wizard`, `form`, `labels`, `modes`, `verification`, `completion`,
+  `accounts`, `payees`, `logout`) and the `EsunAdapter` overrides:
   `detectPageStateDetailed`, `navigateToTransferForm`, `selectSourceAccount`,
   `selectDestinationPayee` / `_trySelectPayee`, `fillAmount`, `fillMemoShort/Long`,
   `submitFormToVerificationPage`, `readBalance`, `readVerificationSummary`,
@@ -183,8 +190,14 @@ Or use the extension itself:
 | Verification-page extraction | verified live |
 | Completion-page extraction (`交易結果`) | verified on a real transfer (2026-07-19) |
 | Multi-job batch (job 2 re-enters the form) | verified on a real 2-job batch (2026-07-19) |
+| Balance read after navigating from the dashboard | verified on the live bank (2026-07-19) |
+| Named lists + migration of the legacy draft | verified in the popup harness and on the real profile |
 
-## 10. Known limitations / TODO
+## 10. Resolved limitations (kept for context)
+
+No open items at the time of writing. Each entry below records a real constraint that
+was hit, why it behaved that way, and how it was resolved — useful when a future
+E.SUN redesign makes one of them resurface.
 
 - ~~**`readBalance` requires being on the transfer form before starting a batch.**~~
   **Fixed 2026-07-19.** E.SUN shows `可用餘額` only on the 資料編輯 form (after a 轉出帳號
@@ -199,18 +212,23 @@ Or use the extension itself:
   now navigates, selects the source, and reads 可用餘額 (34 checks passed; the only
   failure was an unrelated balance-sufficiency stop).
 
-- **One anonymous pending list, kept between runs — serviceable, not a defect.**
-  `pendingBatch` survives dispatch: `popup.js startBatch()` hands the list to the
-  content script and closes without clearing it. With no saved-lists feature, that
-  persistence *is* the "reuse last month's transfers" mechanism, and it works. Two
-  things follow from it, and both are currently the user's job:
-  - dispatching sends **every** job in the list, so a list that was already run gets
-    run again unless it is edited or cleared first;
-  - the list has no name and no last-run record, so "has this one been sent?" can only
-    be answered from the audit log (`job_completed`).
-  Observed 2026-07-19: four jobs accumulated across test runs and the batch precheck
-  stopped the batch on `balance_sufficient` — the policy engine behaving correctly.
-  **Planned improvement (next piece of work):** named saved lists — store several
-  named batches, let the popup list them and have the user pick which one to run,
-  record each list's last-run time/result, and show what is about to be sent before
-  dispatch. See `docs/draft-accumulation.html` for the walkthrough and diagram.
+- ~~**One anonymous pending list kept between runs.**~~ **Superseded 2026-07-19 by
+  named lists.** The old `pendingBatch` was a single unnamed draft that survived
+  dispatch; with no saved-lists feature that persistence *was* the "reuse last
+  month's transfers" mechanism, but it had no name, no last-run record, and
+  dispatch always sent every job in it. (Observed that day: four jobs accumulated
+  across test runs and the batch precheck correctly stopped on
+  `balance_sufficient`.) `src/core/lists.js` now stores several **named** lists
+  under `transferLists`; the popup lists them with per-list counts and totals, the
+  user picks which to run, each list records its last run, and dispatch is gated
+  behind a review screen that itemizes what is about to be sent and warns when the
+  list already ran. `migrateState()` carries any legacy `pendingBatch` into a list
+  named 先前的清單 — verified on the real profile, four queued transfers intact.
+  The legacy key is read but never deleted, so the old draft remains recoverable.
+  See `docs/draft-accumulation.html` for the walkthrough and diagram.
+
+- **Verifying the list UI needs no transfer.** `demo/popup-harness.html` drives the
+  real popup against stubbed `chrome.*` APIs: `START_BATCH` is intercepted and
+  logged rather than dispatched, so migration, switching, the review screen, and
+  last-run recording can all be exercised offline. Run `npm run demo` and open
+  `/demo/popup-harness.html`.
