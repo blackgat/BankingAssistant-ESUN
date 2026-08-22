@@ -160,6 +160,12 @@ Or use the extension itself:
   fields) without advancing — verify the field mapping live.
 - **Console (switch context to the iframe's extension world):**
   `await __bankingAssistant.pageState()`, `.balance()`, `.verification()`, `.payees()`.
+- **Popup harness — no bank at all.** `demo/popup-harness.html` drives the real popup
+  against stubbed `chrome.*` APIs, intercepting and logging `START_BATCH` instead of
+  dispatching it, so migration, list switching, the review screen, and last-run
+  recording can be exercised offline. `npm run demo`, then open
+  `/demo/popup-harness.html`. Exercised end to end on 2026-07-19, and the same paths
+  were then confirmed in the installed extension against the real profile.
 
 ## 8. Where each finding lives in code
 
@@ -230,8 +236,3 @@ E.SUN redesign makes one of them resurface.
   The legacy key is read but never deleted, so the old draft remains recoverable.
   See figure 8 of `docs/architecture.html` for the data model and diagram.
 
-- **Verifying the list UI needs no transfer.** `demo/popup-harness.html` drives the
-  real popup against stubbed `chrome.*` APIs: `START_BATCH` is intercepted and
-  logged rather than dispatched, so migration, switching, the review screen, and
-  last-run recording can all be exercised offline. Run `npm run demo` and open
-  `/demo/popup-harness.html`.
