@@ -189,4 +189,11 @@ globalThis.__bankingAssistant = {
     return runDryRunFill(opts);
   },
 };
-console.info("[BankingAssistant] content script ready. Try: await __bankingAssistant.pageState()");
+// With all_frames enabled this module runs in every frame the bank serves, so
+// announce readiness only from the frame that actually hosts the banking app —
+// otherwise one page load prints this a dozen times into the user's console.
+thisFrameIsBankApp().then((isBankApp) => {
+  if (isBankApp) {
+    console.info("[BankingAssistant] content script ready. Try: await __bankingAssistant.pageState()");
+  }
+});
