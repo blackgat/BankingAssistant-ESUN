@@ -186,14 +186,13 @@ Or use the extension itself:
 
 ## 10. Known limitations / TODO
 
-- **`readBalance` requires being on the transfer form before starting a batch.**
-  E.SUN shows `可用餘額` only on the 資料編輯 form (after a 轉出帳號 is selected), and the
-  runner reads the balance at step 2 *before* it navigates. If a batch is started from
-  another page (e.g. the account dashboard), the read falls through to the generic
-  account-row reader and fails with `account_not_found` / confidence 0. **Workaround:**
-  open the 即時 / 預約轉帳 form before pressing 開始批次.
-  **TODO** (does *not* need a real transfer to implement or test — the form page is
-  enough): make `EsunAdapter.readBalance` navigate to the transfer form itself (click
-  即時 / 預約轉帳) when the source `<select>` is absent, wait for it to load, then select
-  the source and read `可用餘額`. Deferred until real-transfer functionality testing is
-  complete, per request.
+- ~~**`readBalance` requires being on the transfer form before starting a batch.**~~
+  **Fixed 2026-07-19.** E.SUN shows `可用餘額` only on the 資料編輯 form (after a 轉出帳號
+  is selected), and the runner reads the balance *before* it navigates, so starting a
+  batch from another page used to fail with `account_not_found`. `readBalance` now
+  escalates: read the DOM → select the source and await the AJAX value → try the
+  generic account-row reader → and only then navigate to the transfer form itself
+  (click 即時 / 預約轉帳), wait for the source `<select>`, and read. The generic reader
+  is tried *before* navigating on purpose: a page that lists balances directly (demo
+  fixtures, other banks) must not be navigated away from.
+  Covered by a unit test; **awaiting confirmation on the live bank.**

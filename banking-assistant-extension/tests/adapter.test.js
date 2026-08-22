@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { loadFixtureDom } from "./dom-helper.js";
+import { loadFixtureDom, loadDom } from "./dom-helper.js";
 import { EsunAdapter } from "../src/content/extractors/bank-adapter.esun.js";
 import { DEFAULT_CONFIG } from "../src/core/types.js";
 
@@ -31,6 +31,38 @@ test("readBalance extracts the matching account balance with high confidence", a
   assert.ok(r.confidence >= 0.9, `confidence ${r.confidence}`);
   assert.equal(r.value.balance, 50000);
   assert.equal(r.value.accountLast5, "12345");
+});
+
+test("readBalance opens the transfer form when it isn't showing, then reads 可用餘額", async () => {
+  // A minimal E.SUN-shaped page: a dashboard with only the transfer menu link.
+  // Clicking it swaps in a transfer form; choosing the source reveals 可用餘額,
+  // mirroring the bank's AJAX behaviour.
+  const doc = loadDom(`<!DOCTYPE html><html><body>
+    <a class="log_out" href="#logout">登出</a>
+    <div id="app"><a id="menu">即時 / 預約轉帳</a></div>
+  </body></html>`);
+  doc.getElementById("menu").addEventListener("click", () => {
+    doc.getElementById("app").innerHTML = `
+      <div class="step"><dt class="current">Step1資料編輯</dt></div>
+      <form class="transfer-form">
+        <dl><dt>轉出帳號</dt><dd>
+          <select><option value="">請選擇</option><option value="s1">活期存款 ****12345</option></select>
+        </dd></dl>
+        <div id="bal"></div>
+      </form>`;
+    const sel = doc.querySelector("form select");
+    sel.addEventListener("change", () => {
+      if (sel.value) doc.getElementById("bal").innerHTML = `<span>可用餘額<br><span>50,000</span></span>`;
+    });
+  });
+
+  const a = new EsunAdapter({ root: doc, config });
+  assert.equal(a._controlByLabel(a.selectors.labels.source, "select"), null, "no form to begin with");
+
+  const r = await a.readBalance(source);
+  assert.ok(r.confidence >= 0.9, `confidence ${r.confidence}`);
+  assert.equal(r.value.balance, 50000);
+  assert.equal(r.value.sourceAccountId, source.id);
 });
 
 test("extractCurrentBalance convenience wrapper works", async () => {

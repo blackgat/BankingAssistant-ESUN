@@ -403,24 +403,54 @@ export class EsunAdapter extends BaseBankAdapter {
     return { value: null, confidence: 0, missingFields: ["balance_not_shown"] };
   }
 
+  /** Select the source account and poll for the AJAX-rendered 可用餘額. */
+  async _selectSourceAndAwaitBalance(select, sourceAccount) {
+    this._selectRadioByText(this.selectors.modes.instant);
+    selectOptionBy(select, (opt) => this._optionMatchesAccount(opt, sourceAccount));
+    for (let i = 0; i < 20; i++) {
+      await new Promise((r) => setTimeout(r, 150));
+      const result = this._readBalanceFromDom(sourceAccount);
+      if (result.confidence >= 0.9) return result;
+    }
+    return null;
+  }
+
   async readBalance(sourceAccount) {
-    // E.SUN renders 可用餘額 only AFTER a 轉出帳號 is selected. Read it; if it isn't
-    // shown yet and a source <select> is present, select the source ourselves and
-    // wait for the (AJAX-rendered) balance — so the user doesn't have to pre-select.
-    let result = this._readBalanceFromDom(sourceAccount);
-    if (result.confidence >= 0.9) return result;
-    const select = this._controlByLabel(this.selectors.labels.source, "select");
+    // E.SUN renders 可用餘額 only on the transfer form, and only AFTER a 轉出帳號 is
+    // selected. So: read it; else select the source ourselves and wait for the
+    // AJAX value; else navigate to the transfer form first and try again. This
+    // lets a batch start from any page (e.g. the account dashboard) instead of
+    // failing with account_not_found.
+    const direct = this._readBalanceFromDom(sourceAccount);
+    if (direct.confidence >= 0.9) return direct;
+
+    let select = this._controlByLabel(this.selectors.labels.source, "select");
     if (select) {
-      this._selectRadioByText(this.selectors.modes.instant);
-      selectOptionBy(select, (opt) => this._optionMatchesAccount(opt, sourceAccount));
-      for (let i = 0; i < 20; i++) {
-        await new Promise((r) => setTimeout(r, 150));
-        result = this._readBalanceFromDom(sourceAccount);
-        if (result.confidence >= 0.9) return result;
+      const afterSelect = await this._selectSourceAndAwaitBalance(select, sourceAccount);
+      if (afterSelect) return afterSelect;
+    }
+
+    // Try the generic account-row reader before navigating anywhere: a page that
+    // lists balances directly (demo fixtures, other banks) must not be navigated
+    // away from, or we'd destroy the very rows we can read.
+    const generic = await super.readBalance(sourceAccount);
+    if (generic.confidence >= 0.9) return generic;
+
+    // Still nothing and no source <select> here: we're off the transfer form
+    // (e.g. the account dashboard). Open it, wait for the form, then read.
+    if (!select) {
+      await this.navigateToTransferForm();
+      for (let i = 0; i < 30; i++) {
+        await new Promise((r) => setTimeout(r, 200));
+        select = this._controlByLabel(this.selectors.labels.source, "select");
+        if (select) break;
+      }
+      if (select) {
+        const afterNav = await this._selectSourceAndAwaitBalance(select, sourceAccount);
+        if (afterNav) return afterNav;
       }
     }
-    // Fall back to the generic account-row reader (demo fixtures / other banks).
-    return super.readBalance(sourceAccount);
+    return generic;
   }
 
   readCompletion() {
