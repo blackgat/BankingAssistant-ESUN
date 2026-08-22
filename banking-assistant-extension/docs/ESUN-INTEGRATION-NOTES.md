@@ -195,4 +195,22 @@ Or use the extension itself:
   (click 即時 / 預約轉帳), wait for the source `<select>`, and read. The generic reader
   is tried *before* navigating on purpose: a page that lists balances directly (demo
   fixtures, other banks) must not be navigated away from.
-  Covered by a unit test; **awaiting confirmation on the live bank.**
+  Confirmed on the live bank 2026-07-19: starting a batch from the account dashboard
+  now navigates, selects the source, and reads 可用餘額 (34 checks passed; the only
+  failure was an unrelated balance-sufficiency stop).
+
+- **One anonymous pending list, kept between runs — serviceable, not a defect.**
+  `pendingBatch` survives dispatch: `popup.js startBatch()` hands the list to the
+  content script and closes without clearing it. With no saved-lists feature, that
+  persistence *is* the "reuse last month's transfers" mechanism, and it works. Two
+  things follow from it, and both are currently the user's job:
+  - dispatching sends **every** job in the list, so a list that was already run gets
+    run again unless it is edited or cleared first;
+  - the list has no name and no last-run record, so "has this one been sent?" can only
+    be answered from the audit log (`job_completed`).
+  Observed 2026-07-19: four jobs accumulated across test runs and the batch precheck
+  stopped the batch on `balance_sufficient` — the policy engine behaving correctly.
+  **Planned improvement (next piece of work):** named saved lists — store several
+  named batches, let the popup list them and have the user pick which one to run,
+  record each list's last-run time/result, and show what is about to be sent before
+  dispatch. See `docs/draft-accumulation.html` for the walkthrough and diagram.

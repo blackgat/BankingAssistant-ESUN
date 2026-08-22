@@ -1,0 +1,421 @@
+<title>批次清單生命週期</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@600;700&display=swap">
+<style>
+  /* Light palette is the complete set; dark blocks below redefine tokens only. */
+  :root {
+    --ground: #F6F8F6;
+    --surface: #FFFFFF;
+    --surface-2: #EDF1EE;
+    --ink: #161D1A;
+    --ink-2: #47534E;
+    --ink-3: #6E7B76;
+    --line: #D6DEDA;
+    --accent: #0F5D4A;
+    --accent-soft: #E2EFEA;
+    --risk: #A63D2F;
+    --risk-soft: #F7E7E4;
+    --caution: #8A6414;
+    --caution-soft: #F7EEDC;
+    --shadow: 0 1px 2px rgba(22, 29, 26, .05), 0 8px 24px -12px rgba(22, 29, 26, .18);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #101512;
+      --surface: #172019;
+      --surface-2: #1E2A24;
+      --ink: #E8EFEA;
+      --ink-2: #A9B8B1;
+      --ink-3: #7F8F88;
+      --line: #2C3A33;
+      --accent: #5FC0A2;
+      --accent-soft: #14342B;
+      --risk: #E4907F;
+      --risk-soft: #3A211C;
+      --caution: #DCAF4E;
+      --caution-soft: #33270F;
+      --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 8px 24px -12px rgba(0, 0, 0, .6);
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #101512;
+    --surface: #172019;
+    --surface-2: #1E2A24;
+    --ink: #E8EFEA;
+    --ink-2: #A9B8B1;
+    --ink-3: #7F8F88;
+    --line: #2C3A33;
+    --accent: #5FC0A2;
+    --accent-soft: #14342B;
+    --risk: #E4907F;
+    --risk-soft: #3A211C;
+    --caution: #DCAF4E;
+    --caution-soft: #33270F;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 8px 24px -12px rgba(0, 0, 0, .6);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: "Noto Sans TC", system-ui, -apple-system, "Microsoft JhengHei", sans-serif;
+    font-size: 15px;
+    line-height: 1.75;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .page {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 56px 24px 96px;
+    display: flex;
+    flex-direction: column;
+    gap: 44px;
+  }
+
+  h1, h2, h3 { font-family: "Noto Serif TC", Georgia, serif; text-wrap: balance; margin: 0; }
+  h1 { font-size: clamp(30px, 4.4vw, 42px); font-weight: 700; letter-spacing: -.01em; line-height: 1.25; }
+  h2 { font-size: 21px; font-weight: 600; }
+  h3 { font-size: 16px; font-weight: 600; }
+  p { margin: 0; max-width: 68ch; }
+
+  code, .mono {
+    font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: .88em;
+  }
+  code {
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: .1em .38em;
+    color: var(--ink-2);
+  }
+
+  .eyebrow {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 11.5px;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0;
+  }
+
+  header { display: flex; flex-direction: column; gap: 14px; }
+  .dek { font-size: 17px; color: var(--ink-2); max-width: 62ch; }
+  .meta {
+    display: flex; flex-wrap: wrap; gap: 8px 20px;
+    font-family: "JetBrains Mono", monospace; font-size: 12px; color: var(--ink-3);
+    border-top: 1px solid var(--line); padding-top: 14px;
+  }
+
+  section { display: flex; flex-direction: column; gap: 16px; }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 22px 24px;
+    box-shadow: var(--shadow);
+    display: flex; flex-direction: column; gap: 12px;
+  }
+  .card.caution { border-color: color-mix(in srgb, var(--caution) 45%, var(--line)); background: var(--caution-soft); }
+  .card.accent { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); background: var(--accent-soft); }
+
+  .checkline {
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    font-family: "JetBrains Mono", monospace; font-size: 13px;
+  }
+  .tag {
+    font-family: "JetBrains Mono", monospace; font-size: 11px; font-weight: 500;
+    letter-spacing: .08em; text-transform: uppercase;
+    padding: 3px 9px; border-radius: 999px; white-space: nowrap;
+  }
+  .tag.pass { background: var(--accent-soft); color: var(--accent); }
+  .tag.fail { background: var(--risk-soft); color: var(--risk); border: 1px solid color-mix(in srgb, var(--risk) 35%, transparent); }
+
+  .diagram { overflow-x: auto; }
+  .diagram svg { min-width: 880px; width: 100%; height: auto; display: block; }
+
+  /* Diagram type + fills, all token-driven so the SVG themes with the page. */
+  .n-box { fill: var(--surface); stroke: var(--line); stroke-width: 1.5; }
+  .n-box.accent { fill: var(--accent-soft); stroke: color-mix(in srgb, var(--accent) 55%, var(--line)); }
+  .n-box.caution { fill: var(--caution-soft); stroke: color-mix(in srgb, var(--caution) 55%, var(--line)); }
+  .n-title { fill: var(--ink); font: 500 14.5px "Noto Sans TC", sans-serif; }
+  .n-sub { fill: var(--ink-3); font: 400 11.5px "JetBrains Mono", monospace; }
+  .n-sub.accent { fill: var(--accent); }
+  .n-sub.caution { fill: var(--caution); }
+  .band-label { fill: var(--accent); font: 500 11.5px "JetBrains Mono", monospace; letter-spacing: .12em; }
+  .band-label.caution { fill: var(--caution); }
+  .flow { stroke: var(--ink-3); stroke-width: 1.6; fill: none; }
+  .flow.caution { stroke: var(--caution); }
+  .flow.carry { stroke: var(--accent); stroke-width: 1.8; stroke-dasharray: 5 4; }
+  .strip { fill: var(--surface-2); stroke: var(--line); stroke-width: 1; }
+  .strip.accent { fill: var(--accent-soft); stroke: color-mix(in srgb, var(--accent) 40%, transparent); }
+  .strip.caution { fill: var(--caution-soft); stroke: color-mix(in srgb, var(--caution) 40%, transparent); }
+  .strip-text { fill: var(--ink-2); font: 400 12.5px "Noto Sans TC", sans-serif; }
+  .strip-text.accent { fill: var(--accent); font-weight: 500; }
+  .strip-text.caution { fill: var(--caution); font-weight: 500; }
+  .strip-mono { fill: var(--ink-3); font: 400 12px "JetBrains Mono", monospace; }
+  .carry-note { fill: var(--accent); font: 500 11.5px "JetBrains Mono", monospace; }
+
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 720px) { .two-col { grid-template-columns: 1fr; } }
+
+  ul { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 7px; max-width: 68ch; }
+  li::marker { color: var(--ink-3); }
+
+  .steps { display: flex; flex-direction: column; gap: 10px; }
+  .step {
+    display: grid; grid-template-columns: auto 1fr; gap: 4px 14px;
+    padding: 14px 16px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface);
+  }
+  .step-n {
+    font-family: "JetBrains Mono", monospace; font-size: 12.5px; font-weight: 500;
+    color: var(--accent); white-space: nowrap;
+  }
+  .step-body { font-size: 14px; color: var(--ink-2); }
+  .step-body strong { color: var(--ink); font-weight: 500; }
+
+  footer { border-top: 1px solid var(--line); padding-top: 18px; color: var(--ink-3); font-size: 13.5px; }
+</style>
+
+<div class="page">
+
+  <header>
+    <p class="eyebrow">Banking Transfer Assistant — 行為說明</p>
+    <h1>批次清單生命週期</h1>
+    <p class="dek">
+      待轉清單存在 <code>chrome.storage.local</code>，送出批次後<strong>會保留下來</strong>。
+      在還沒有「多份清單」功能之前，這就是目前「重複使用上次清單」的做法 ——
+      堪用，但送出前你得自己確認清單內容。
+    </p>
+    <div class="meta">
+      <span>2026-07-19</span>
+      <span>src/popup/popup.js · startBatch()</span>
+      <span>storage key: pendingBatch</span>
+    </div>
+  </header>
+
+  <section>
+    <h2>先講清楚兩個名詞</h2>
+    <div class="two-col">
+      <div class="card">
+        <h3>一筆轉帳 ＝ 一個 job</h3>
+        <p>一個轉出帳號、一個收款人、一個金額。popup 每按一次「加入批次」就產生一筆。圖上的 <strong>A</strong>、<strong>B</strong> 各代表<strong>一筆</strong>轉帳。</p>
+      </div>
+      <div class="card">
+        <h3>待轉清單 ＝ 一個 batch</h3>
+        <p>裝著這些轉帳的那份列表，存在 <code>pendingBatch</code>。「清單：2 筆 ﹝A, B﹞」代表這份清單裡有兩筆會被送出去的轉帳。</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>清單怎麼在兩次批次之間活著</h2>
+    <p>
+      每加一筆轉帳，popup 就把整份清單寫回 <code>pendingBatch</code>；下次開啟 popup 時再讀回來。
+      送出批次時，popup 把清單交給 content script 後就關閉，<strong>清單本身留在原地</strong> ——
+      所以下一次你可以直接沿用，不必重打。
+    </p>
+
+    <div class="diagram">
+      <svg viewBox="0 0 920 600" role="img" aria-labelledby="diagram-title diagram-desc">
+        <title id="diagram-title">待轉清單在多次批次之間的生命週期</title>
+        <desc id="diagram-desc">
+          第一次批次轉帳完成後，清單仍留在 storage，成為下次可沿用的內容。
+          再次開啟 popup 時清單還在，可直接重跑或再加幾筆，但送出會把清單裡每一筆都再送一次。
+          今天的情況是累積到四筆，總額超過可用餘額，被批次前置檢查擋下。
+        </desc>
+
+        <defs>
+          <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,1 L9,5 L0,9 z" fill="var(--ink-3)"/>
+          </marker>
+          <marker id="ar-accent" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,1 L9,5 L0,9 z" fill="var(--accent)"/>
+          </marker>
+          <marker id="ar-caution" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,1 L9,5 L0,9 z" fill="var(--caution)"/>
+          </marker>
+        </defs>
+
+        <!-- Band 1: first batch — completes, list is kept for reuse -->
+        <text class="band-label" x="16" y="20">第 1 次批次</text>
+
+        <g>
+          <rect class="n-box" x="16" y="34" width="196" height="62" rx="8"/>
+          <text class="n-title" x="32" y="60">popup 加入 1 筆轉帳</text>
+          <text class="n-sub" x="32" y="80">A ＝ 一筆（job）</text>
+        </g>
+        <path class="flow" d="M216,65 H240" marker-end="url(#ar)"/>
+        <g>
+          <rect class="n-box" x="244" y="34" width="196" height="62" rx="8"/>
+          <text class="n-title" x="260" y="60">寫進待轉清單</text>
+          <text class="n-sub" x="260" y="80">清單：1 筆 ﹝A﹞</text>
+        </g>
+        <path class="flow" d="M444,65 H468" marker-end="url(#ar)"/>
+        <g>
+          <rect class="n-box" x="472" y="34" width="196" height="62" rx="8"/>
+          <text class="n-title" x="488" y="60">按下開始批次</text>
+          <text class="n-sub" x="488" y="80">送出後 popup 關閉</text>
+        </g>
+        <path class="flow" d="M672,65 H696" marker-end="url(#ar)"/>
+        <g>
+          <rect class="n-box accent" x="700" y="34" width="204" height="62" rx="8"/>
+          <text class="n-title" x="716" y="60">A 轉帳完成</text>
+          <text class="n-sub accent" x="716" y="80">交易結果 ✓</text>
+        </g>
+
+        <g>
+          <rect class="strip accent" x="244" y="112" width="660" height="34" rx="6"/>
+          <text class="strip-text accent" x="262" y="134">清單保留下來 —— 這就是目前「沿用上次清單」的機制</text>
+        </g>
+
+        <path class="flow carry" d="M262,146 V176" marker-end="url(#ar-accent)"/>
+        <text class="carry-note" x="278" y="168">清單沿用到下一次</text>
+
+        <!-- Band 2: reuse — the thing to check before dispatching -->
+        <text class="band-label caution" x="16" y="204">下一次開啟 popup — 清單被沿用</text>
+
+        <g>
+          <rect class="n-box" x="16" y="218" width="196" height="62" rx="8"/>
+          <text class="n-title" x="32" y="244">A 還在清單裡</text>
+          <text class="n-sub" x="32" y="264">上次已經轉出去了</text>
+        </g>
+        <path class="flow" d="M216,249 H240" marker-end="url(#ar)"/>
+        <g>
+          <rect class="n-box" x="244" y="218" width="196" height="62" rx="8"/>
+          <text class="n-title" x="260" y="244">直接重跑，或再加 B</text>
+          <text class="n-sub" x="260" y="264">清單：2 筆 ﹝A, B﹞</text>
+        </g>
+        <path class="flow" d="M444,249 H468" marker-end="url(#ar)"/>
+        <g>
+          <rect class="n-box" x="472" y="218" width="196" height="62" rx="8"/>
+          <text class="n-title" x="488" y="244">按下開始批次</text>
+          <text class="n-sub" x="488" y="264">整份清單一起送出</text>
+        </g>
+        <path class="flow caution" d="M672,249 H696" marker-end="url(#ar-caution)"/>
+        <g>
+          <rect class="n-box caution" x="700" y="218" width="204" height="62" rx="8"/>
+          <text class="n-title" x="716" y="244">A 會再轉一次</text>
+          <text class="n-sub caution" x="716" y="264">清單裡每一筆都會送</text>
+        </g>
+
+        <g>
+          <rect class="strip caution" x="16" y="296" width="888" height="34" rx="6"/>
+          <text class="strip-text caution" x="34" y="318">沿用是刻意的；要留意的是「送出＝清單裡每一筆都再送一次」，所以按下去之前先看清單內容。</text>
+        </g>
+
+        <path class="flow carry" d="M34,330 V360" marker-end="url(#ar-caution)"/>
+
+        <!-- Band 3: what actually happened today -->
+        <text class="band-label caution" x="16" y="388">今天實際發生 — 被餘額檢查擋下</text>
+
+        <g>
+          <rect class="n-box" x="16" y="402" width="196" height="62" rx="8"/>
+          <text class="n-title" x="32" y="428">多次測試累積</text>
+          <text class="n-sub" x="32" y="448">清單：4 筆轉帳</text>
+        </g>
+        <path class="flow caution" d="M216,433 H240" marker-end="url(#ar-caution)"/>
+        <g>
+          <rect class="n-box" x="244" y="402" width="196" height="62" rx="8"/>
+          <text class="n-title" x="260" y="428">批次前置檢查</text>
+          <text class="n-sub" x="260" y="448">4 筆總額 + 保留餘額</text>
+        </g>
+        <path class="flow caution" d="M444,433 H468" marker-end="url(#ar-caution)"/>
+        <g>
+          <rect class="n-box caution" x="472" y="402" width="196" height="62" rx="8"/>
+          <text class="n-title" x="488" y="428">超過可用餘額</text>
+          <text class="n-sub caution" x="488" y="448">balance_sufficient</text>
+        </g>
+        <path class="flow caution" d="M672,433 H696" marker-end="url(#ar-caution)"/>
+        <g>
+          <rect class="n-box caution" x="700" y="402" width="204" height="62" rx="8"/>
+          <text class="n-title" x="716" y="428">整批停止</text>
+          <text class="n-sub caution" x="716" y="448">沒有任何一筆送出</text>
+        </g>
+
+        <g>
+          <rect class="strip" x="16" y="480" width="888" height="34" rx="6"/>
+          <text class="strip-text" x="34" y="502">policy engine 依設定攔下整批，一毛錢都沒有動 —— 這是它該做的事。</text>
+        </g>
+
+        <g>
+          <rect class="strip" x="16" y="530" width="888" height="52" rx="6"/>
+          <text class="strip-text" x="34" y="552">同一次也證明了讀餘額的修正成功：自己導到轉帳表單、選好轉出帳號、讀到可用餘額。</text>
+          <text class="strip-mono" x="34" y="572">34 項檢查通過，唯一失敗項 balance_sufficient:allowance_account — 與 readBalance 無關</text>
+        </g>
+      </svg>
+    </div>
+  </section>
+
+  <section>
+    <h2>今天那次的判讀</h2>
+    <div class="card caution">
+      <div class="checkline">
+        <span class="tag pass">34 項通過</span>
+        <span class="tag fail">1 項失敗</span>
+        <span class="mono">balance_sufficient:allowance_account</span>
+      </div>
+      <p>
+        清單裡有 <strong>4 筆轉帳</strong>，都是先前測試累積下來的。
+        4 筆總額加上帳戶要保留的最低餘額超過可用餘額，於是 policy engine 擋下整批。
+        停止的理由與餘額讀取無關 —— <code>readBalance</code> 的修正在這一次是成功的。
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <h2>現況：初步堪用</h2>
+    <div class="two-col">
+      <div class="card accent">
+        <h3>目前可以做到的</h3>
+        <p>清單會留著，下次可以直接重跑同一組轉帳，不必重打。對每個月固定幾筆的情境已經夠用。</p>
+      </div>
+      <div class="card">
+        <h3>還缺的</h3>
+        <p>只有一份清單，沒有名字、不能切換，也分不出「這份跑過了沒」。要換一組轉帳只能清空重打。</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>下一步：記憶多份清單</h2>
+    <p>
+      讓使用者自己決定每次要跑哪一份清單，取代目前「只有一份、靠沿用」的做法。
+    </p>
+    <div class="steps">
+      <div class="step">
+        <span class="step-n">具名儲存</span>
+        <span class="step-body">把一組轉帳存成一份<strong>有名字的清單</strong>（例如「每月家用」「房租」），而不是單一份匿名草稿。</span>
+      </div>
+      <div class="step">
+        <span class="step-n">選擇與切換</span>
+        <span class="step-body">popup 開啟時列出所有清單，<strong>由你挑要跑哪一份</strong>；沿用變成一個明確的選擇，而不是預設殘留。</span>
+      </div>
+      <div class="step">
+        <span class="step-n">上次執行狀態</span>
+        <span class="step-body">每份清單記下<strong>上次跑的時間與結果</strong>，重跑前一眼就知道這份是不是剛跑過。</span>
+      </div>
+      <div class="step">
+        <span class="step-n">送出前檢視</span>
+        <span class="step-body">開始批次前列出即將送出的每一筆與總額，<strong>把「會送出什麼」講清楚</strong>再送。</span>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>在那之前的使用建議</h2>
+    <ul>
+      <li>按開始批次前，先看一眼 popup 的<strong>筆數與總額</strong> —— 那就是實際會送進 runner 的內容。</li>
+      <li>不想沿用上次那幾筆時，按 <strong>「清空」</strong>再重新加入。</li>
+      <li>要核對哪些已經完成過：Options 頁 → 下載稽核紀錄（JSONL）→ 找 <code>job_completed</code>。</li>
+    </ul>
+  </section>
+
+  <footer>
+    這份文件描述的是待轉清單的生命週期，不含任何帳號、金額或個人資料。
+  </footer>
+
+</div>
