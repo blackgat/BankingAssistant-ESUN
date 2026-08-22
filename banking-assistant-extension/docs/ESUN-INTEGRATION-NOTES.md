@@ -182,6 +182,7 @@ Or use the extension itself:
 | Submit → 資料確認 (`下一步`) | verified live |
 | Verification-page extraction | verified live |
 | Completion-page extraction (`交易結果`) | verified on a real transfer (2026-07-19) |
+| Multi-job batch (job 2 re-enters the form) | verified on a real 2-job batch (2026-07-19) |
 
 ## 10. Known limitations / TODO
 
