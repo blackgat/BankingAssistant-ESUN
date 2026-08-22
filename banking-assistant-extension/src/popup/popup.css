@@ -62,6 +62,17 @@ button.ghost { background: var(--bg-soft); }
 .joblist .meta { color: var(--muted); font-size: 11px; }
 .joblist button.rm { padding: 2px 8px; font-size: 11px; }
 .err { color: var(--err); font-size: 12px; margin: 6px 0 0; }
+.review {
+  margin-top: 10px;
+  padding: 10px;
+  border: 1px solid var(--green);
+  border-radius: 8px;
+  background: #f3f9f6;
+}
+.review h3 { margin: 0 0 4px; font-size: 13px; color: var(--green); }
+.review .muted { font-size: 11px; display: block; margin-bottom: 6px; }
+.reviewtotal { margin: 8px 0 0; font-size: 12px; }
+.warnrow { color: var(--err); }
 footer { margin-top: 4px; }
 footer a { color: var(--green-2); font-size: 12px; }
 .disclaimer { color: var(--muted); font-size: 11px; margin: 8px 0 0; }

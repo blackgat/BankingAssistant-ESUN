@@ -13,6 +13,20 @@
     </header>
 
     <section class="card">
+      <div class="rowbetween">
+        <h2>轉帳清單</h2>
+        <span id="lastRun" class="muted" style="font-size:11px;"></span>
+      </div>
+      <select id="listSelect" aria-label="選擇轉帳清單"></select>
+      <div class="actions">
+        <button id="newList" class="ghost">新增</button>
+        <button id="renameList" class="ghost">重新命名</button>
+        <button id="dupList" class="ghost">複製</button>
+        <button id="deleteList" class="ghost">刪除</button>
+      </div>
+    </section>
+
+    <section class="card">
       <h2>新增一筆</h2>
       <label>來源帳戶
         <select id="sourceSelect"></select>
@@ -49,6 +63,18 @@
         <button id="clearJobs" class="ghost">清空</button>
       </div>
       <p id="runStatus" class="status" hidden></p>
+
+      <div id="review" class="review" hidden>
+        <h3>送出前確認</h3>
+        <p class="muted">以下每一筆都會被送出。確認無誤再送出，每筆仍需你本人在銀行驗證頁授權。</p>
+        <ol id="reviewList" class="joblist"></ol>
+        <p class="reviewtotal">共 <strong id="reviewCount">0</strong> 筆，總額 <strong id="reviewTotal">NT$ 0</strong></p>
+        <p id="reviewWarn" class="err" hidden></p>
+        <div class="actions">
+          <button id="confirmSend" class="primary">確認送出</button>
+          <button id="cancelSend" class="ghost">返回</button>
+        </div>
+      </div>
     </section>
 
     <section class="card">

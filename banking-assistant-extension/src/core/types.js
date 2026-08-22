@@ -86,7 +86,10 @@ export const LOGIN_STATES = Object.freeze({
 export const STORAGE_KEYS = Object.freeze({
   CONFIG: "assistantConfig",
   AUDIT_LOG: "auditLog",
+  // Legacy single anonymous draft. Read once on upgrade so queued transfers
+  // migrate into a named list, then superseded by LISTS.
   BATCH: "pendingBatch",
+  LISTS: "transferLists",
 });
 
 // Default configuration seeded on install. Uses the SPEC example accounts/payees

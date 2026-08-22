@@ -3,6 +3,7 @@
 // script's isolated world, so chrome.runtime / chrome.storage are available.
 
 import { STORAGE_KEYS, DEFAULT_CONFIG, LOGIN_STATES } from "../core/types.js";
+import * as Lists from "../core/lists.js";
 import { isOriginAllowed } from "../core/allowlist.js";
 import { AuditLogger } from "../core/logger.js";
 import { createAdapter } from "./extractors/bank-adapter.esun.js";
@@ -16,7 +17,25 @@ async function loadConfig() {
   return stored || DEFAULT_CONFIG;
 }
 
-async function startBatch(batch) {
+/**
+ * Write the outcome back onto the named list so the popup can show whether this
+ * list was just run. Best-effort: a failure here must never affect the batch.
+ * @param {string|undefined} listId
+ * @param {{status: string, completed?: number, total?: number, reason?: string}} run
+ */
+async function recordListRun(listId, run) {
+  if (!listId) return;
+  try {
+    const stored = (await chrome.storage.local.get(STORAGE_KEYS.LISTS))[STORAGE_KEYS.LISTS];
+    if (!stored) return;
+    const next = Lists.recordRun(Lists.migrateState(stored, null), listId, run);
+    await chrome.storage.local.set({ [STORAGE_KEYS.LISTS]: next });
+  } catch {
+    // Never let bookkeeping break the run.
+  }
+}
+
+async function startBatch(batch, listId) {
   if (running) return { ok: false, message: "另一個批次正在執行中" };
   const config = await loadConfig();
 
@@ -37,9 +56,21 @@ async function startBatch(batch) {
 
   try {
     const result = await runner.run(batch);
+    const completed = (result.results || []).filter((r) => r.status === "completed").length;
+    await recordListRun(listId, {
+      status: result.stopped ? Lists.RUN_STATUS.STOPPED : Lists.RUN_STATUS.COMPLETED,
+      completed,
+      total: batch.jobs.length,
+      reason: result.reason,
+    });
     return { ok: !result.stopped, ...result };
   } catch (e) {
     overlay.showError("執行發生未預期錯誤，已停止。");
+    await recordListRun(listId, {
+      status: Lists.RUN_STATUS.STOPPED,
+      total: batch.jobs?.length,
+      reason: "unexpected_error",
+    });
     return { ok: false, message: e?.message || "unknown error" };
   } finally {
     running = false;
@@ -94,7 +125,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       // Every frame receives this; only the banking-app frame handles it so the
       // empty top frame never answers with a misleading "not logged in".
       thisFrameIsBankApp().then((ok) => {
-        if (ok) startBatch(msg.batch).then(sendResponse);
+        if (ok) startBatch(msg.batch, msg.listId).then(sendResponse);
       });
       return true; // async
     case "DRY_RUN_FILL":
