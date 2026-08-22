@@ -163,6 +163,9 @@ Or use the extension itself:
 
 ## 8. Where each finding lives in code
 
+Only the E.SUN-specific parts are listed here; for the whole system's
+component-to-file map see the table at the end of `docs/architecture.html`.
+
 - [`manifest.json`](../manifest.json) — `all_frames`, `host_permissions: https://*.esunbank.com.tw/*`.
 - [`bank-adapter.esun.js`](../src/content/extractors/bank-adapter.esun.js) — `ESUN_SELECTORS`
   (`login`, `pages`, `wizard`, `form`, `labels`, `modes`, `verification`, `completion`,
@@ -225,7 +228,7 @@ E.SUN redesign makes one of them resurface.
   list already ran. `migrateState()` carries any legacy `pendingBatch` into a list
   named 先前的清單 — verified on the real profile, four queued transfers intact.
   The legacy key is read but never deleted, so the old draft remains recoverable.
-  See `docs/draft-accumulation.html` for the walkthrough and diagram.
+  See figure 8 of `docs/architecture.html` for the data model and diagram.
 
 - **Verifying the list UI needs no transfer.** `demo/popup-harness.html` drives the
   real popup against stubbed `chrome.*` APIs: `START_BATCH` is intercepted and

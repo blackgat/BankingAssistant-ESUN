@@ -429,8 +429,12 @@ flowchart LR
     <p class="fignum">圖 8 · 資料模型</p>
     <h2>轉帳清單怎麼存</h2>
     <p>
-      一份「清單」裝著多筆轉帳，並記住自己上次執行的結果 ——
-      讓你重跑前一眼就知道這份是不是剛送出過。
+      先分清楚兩個名詞：<strong>一筆轉帳（job）</strong>是一個轉出帳號、一個收款人、一個金額；
+      <strong>一份清單（batch）</strong>則是裝著這些轉帳的列表。「清單：2 筆」代表裡面有兩筆會被送出去的轉帳。
+    </p>
+    <p>
+      一份清單記住自己上次執行的結果 —— 讓你重跑前一眼就知道這份是不是剛送出過。
+      這點很重要，因為<strong>送出會把清單裡的每一筆都轉出去</strong>，包含上次已經轉過的。
     </p>
     <div class="fig">
       <svg viewBox="0 0 860 290" role="img" aria-labelledby="f8t f8d">
@@ -482,6 +486,12 @@ flowchart LR
           </text>
         </g>
       </svg>
+    </div>
+    <div class="note">
+      <strong>沿革：</strong>最早只有一份匿名草稿，送出後留著就成了「沿用上次清單」的替代做法。
+      它堪用，但沒有名字、不能切換，也看不出跑過沒有 —— 曾經因為多次測試累積成 4 筆，
+      被批次前置檢查以餘額不足擋下（policy 正確運作）。之後才改成現在這套具名清單。
+      當時的判讀細節記在 <code>docs/ESUN-INTEGRATION-NOTES.md</code> 第 10 節。
     </div>
   </section>
 

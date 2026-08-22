@@ -6,7 +6,7 @@ authorize every transfer yourself. The extension only assists: it checks balance
 fills the agreed form fields, detects page state, loops through multiple transfers,
 shows the final balance, and helps you click logout.
 
-> This implements `BankingAssistantBrowserExtension-SPEC.md` v0.1. Target bank for
+> This implements [`docs/SPEC.md`](docs/SPEC.md) v0.1. Target bank for
 > this build is **玉山銀行 (E.SUN)**; the bank-specific selectors are placeholders
 > you must verify against the real site (see "Replacing the bank selectors").
 
@@ -138,50 +138,26 @@ that snapshot to find what changed.
 
 ---
 
-## Architecture
+## Documentation
 
-```
-manifest.json                 MV3, minimal permissions, E.SUN host only
-src/
-  background/service-worker.js (module) seeds default config; tiny storage helpers
-  content/
-    main.js                    classic loader -> dynamic-imports the ESM entry
-    main.module.js             wires adapter + overlay + logger + runner on a message
-    runner.js                  SPEC section 9 orchestration (env-agnostic, injectable waiter)
-    overlay.js                 fixed shadow-DOM overlay; renders sanitized values only
-    state-machine.js           batch/job state machines + forbidden transitions
-    extractors/
-      bank-adapter.example.js  BaseBankAdapter + documented EXAMPLE selector map
-      bank-adapter.esun.js     ESUN_SELECTORS + EsunAdapter + adapter registry
-    actions/
-      transfer-form-actions.js DOM helpers + action allow/deny boundary
-  core/
-    types.js                   constants, typedefs, DEFAULT_CONFIG
-    policy.js                  deterministic batch/job/verification policy (pure)
-    sanitizer.js               account/name/reference masking, deep redaction (pure)
-    allowlist.js               origin + payee allowlisting (fail closed)
-    logger.js                  sanitized audit log (chrome.storage or in-memory)
-  popup/                       batch editor (build/import/start a batch)
-  options/                     config editor, import/export, audit log download/clear
-tests/                         node:test suites + HTML fixtures
-demo/                          offline harness that runs the real flow
-scripts/serve.mjs              dependency-free static server for the demo
-```
+Everything beyond installing and running lives in [`docs/`](docs/):
+
+| Document | What it covers |
+|---|---|
+| [`docs/architecture.html`](docs/architecture.html) | The visual guide: components, the safety boundary, a batch's lifecycle, the job state machine, page detection, the policy gates, masking, and the transfer-list model — eight diagrams plus a component-to-file table. Open it in a browser. |
+| [`docs/ESUN-INTEGRATION-NOTES.md`](docs/ESUN-INTEGRATION-NOTES.md) | E.SUN's real DOM as observed: the iframe architecture, the three-step wizard, label-based fields, mode radios, where the balance appears, plus re-inspection snippets for when E.SUN redesigns. |
+| [`docs/SPEC.md`](docs/SPEC.md) | The original v0.1 specification this implements. |
 
 **No build system.** Core modules are ES modules (directly unit-testable). The
 manifest content script is a classic loader that `import()`s the ESM entry; those
 files are listed in `web_accessible_resources`. The service worker is `type: module`.
 
-**Why `all_frames: true` is enabled (SPEC 3.3).** E.SUN's online banking serves
-its entire app inside a same-origin iframe (observed: the top page at
-`https://ebank.esunbank.com.tw/` embeds `iframe1` →
-`https://ebank.esunbank.com.tw/fco/fco08001/FCO08001_Home.faces`, which holds the
-real logout control, account list, transfer form, etc.). A top-frame-only content
-script sees an empty shell, so `detectLoginState()` fails. With `all_frames: true`
-the content script also runs inside that same-origin iframe. The popup broadcasts
-`START_BATCH` to every frame, but only the frame whose `detectLoginState()` is
-`logged_in` handles it (`thisFrameIsBankApp()` in `main.module.js`); the empty top
-frame stays silent. The overlay therefore renders inside the banking iframe.
+**Why `all_frames: true` is enabled (SPEC 3.3).** E.SUN serves its entire banking
+app inside a same-origin iframe, so a top-frame-only content script sees an empty
+shell and `detectLoginState()` fails. With `all_frames: true` the content script
+also runs inside that iframe; `START_BATCH` is broadcast to every frame but only
+the one whose `detectLoginState()` is `logged_in` acts on it (`thisFrameIsBankApp()`
+in `main.module.js`). Details in the E.SUN notes, section 1.
 
 ## How the boundary is enforced
 
