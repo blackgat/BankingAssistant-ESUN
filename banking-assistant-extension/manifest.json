@@ -4,8 +4,13 @@
   "version": "0.1.0",
   "description": "Local banking transfer assistant. Does not store passwords/OTP/full account numbers. Never clicks the final transfer confirmation; the user authorizes every transfer.",
   "minimum_chrome_version": "110",
-  "permissions": ["storage", "activeTab"],
-  "host_permissions": ["https://*.esunbank.com.tw/*"],
+  "permissions": [
+    "storage",
+    "activeTab"
+  ],
+  "host_permissions": [
+    "https://*.esunbank.com.tw/*"
+  ],
   "action": {
     "default_popup": "src/popup/popup.html",
     "default_title": "Banking Transfer Assistant"
@@ -17,8 +22,12 @@
   },
   "content_scripts": [
     {
-      "matches": ["https://*.esunbank.com.tw/*"],
-      "js": ["src/content/main.js"],
+      "matches": [
+        "https://*.esunbank.com.tw/*"
+      ],
+      "js": [
+        "src/content/main.js"
+      ],
       "run_at": "document_idle",
       "all_frames": true
     }
@@ -40,7 +49,10 @@
         "src/core/allowlist.js",
         "src/core/logger.js"
       ],
-      "matches": ["https://*.esunbank.com.tw/*"]
+      "matches": [
+        "https://*.esunbank.com.tw/*"
+      ]
     }
-  ]
+  ],
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAvU16O3z6E2O3lGk1FX4vUANwM2UVnC7gSrZ7ChA1mi95bakyqpWDneedBufmw6nwbRyBCGzitvnOik6HGzenOLd/0Bob9Uyp25mluO/Yph0aCPzOAffraMqi4AzeaVUlpqtyzZEPH0Vjes8cUfVobHu4+awD/ew3zIgzqYTbaDg/ipmGZ09xCF1G/BMsUI7z32QwITIKXkh03LoW5ITommt/GK2f1p/051TUKCA3pGk46jDCnl6ROi4gvqYxr8aNrVXim2doPzl2PhgL7OIjSsCyvr7JSu7Buscjyw6mEkFUlRVlcO0/hRzKgNrwVjPStK89HXMFbYDiMcbQE2amhwIDAQAB"
 }
