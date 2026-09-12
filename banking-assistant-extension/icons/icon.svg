@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128" role="img" aria-label="Banking Transfer Assistant">
+  <title>Banking Transfer Assistant</title>
+  <!-- The mark is the extension's one defining behaviour: it advances a transfer
+       up to a line and stops there for the person to authorise. The amber bar is
+       that stop; it is deliberately the only warm colour, and the only element
+       the arrow does not cross. Nothing here borrows a bank's branding. -->
+  <rect width="128" height="128" rx="28" fill="#0B5D3B"/>
+  <path d="M22 64 H68" stroke="#ffffff" stroke-width="18"/>
+  <path d="M58 38 L90 64 L58 90 Z" fill="#ffffff"/>
+  <rect x="99" y="28" width="16" height="72" rx="8" fill="#FFD166"/>
+</svg>

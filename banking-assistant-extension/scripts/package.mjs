@@ -14,7 +14,7 @@ const OUT_DIR = join(ROOT, "dist");
 
 // Everything Chrome needs at runtime, and nothing else: no tests, no demo
 // harness, no docs, no node_modules, no packaging script.
-const INCLUDE = ["manifest.json", "src"];
+const INCLUDE = ["manifest.json", "src", "icons"];
 
 // ---------------------------------------------------------------- zip writer
 
@@ -187,9 +187,10 @@ function manifestReferences(manifest) {
     (war.resources ?? []).forEach(push);
   }
   for (const icon of Object.values(manifest.icons ?? {})) push(icon);
+  for (const icon of Object.values(manifest.action?.default_icon ?? {})) push(icon);
 
   // Wildcards would need globbing; nothing here uses them, so flag rather than guess.
-  return refs.filter((r) => !r.includes("*"));
+  return [...new Set(refs.filter((r) => !r.includes("*")))];
 }
 
 const cs_css = (m) => (m.content_scripts ?? []).flatMap((cs) => cs.css ?? []);
