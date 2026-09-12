@@ -50,6 +50,57 @@ The content script only runs on `https://*.esunbank.com.tw/*` (no `<all_urls>`).
 To target a different host, edit `host_permissions`, `content_scripts[].matches`,
 and `web_accessible_resources[].matches` in `manifest.json`.
 
+### Pin the extension ID before you rely on it
+
+An unpacked extension's ID is derived from the **absolute path of this folder**, and
+`chrome.storage.local` — where your transfer lists, payees, and limits live — is keyed
+by that ID. Move or rename the folder and Chrome treats it as a different extension:
+the old settings are still on disk under the old ID, but the new install starts empty.
+
+To make the ID permanent, give the manifest a public key:
+
+```bash
+openssl genrsa -out key.pem 2048
+openssl rsa -in key.pem -pubout -outform DER | openssl base64 -A
+```
+
+Add the printed string to `manifest.json` as a top-level `"key"` field, then reload.
+From then on the ID follows the key, not the path, so the extension survives moving
+the repo or copying it to another machine. Keep `key.pem` out of the repo (it is only
+needed to sign a `.crx`); the `key` value in the manifest is a public key.
+
+Adding, changing, or removing `key` **changes the ID**, which means starting from empty
+storage. Export your settings from the Options page first, then import them back.
+
+## Packaging
+
+```bash
+npm run package
+```
+
+Writes `dist/banking-assistant-esun-v<version>.zip` containing exactly what Chrome needs
+at runtime — `manifest.json` and `src/` — and nothing else: no tests, demo harness, docs,
+or `node_modules`. Before writing, it fails if the manifest points at a file that is not
+in the package, and warns about anything under `src/core/` or `src/content/` that ships
+without being listed in `web_accessible_resources`, since a dynamic `import()` of such a
+module fails only at runtime inside the bank page.
+
+The ZIP is for keeping a versioned copy and for moving the extension to another machine —
+unzip it and **Load unpacked** the extracted folder. It is not an installer:
+
+- **Load unpacked (recommended).** What the install section above describes. Requires
+  Developer mode to stay on.
+- **`.crx`.** `chrome://extensions` → **Pack extension** produces a signed `.crx` and a
+  `.pem`. Chrome refuses to install a `.crx` dragged in from outside the Web Store, so on
+  its own this is only an archive format. Installing one for real needs a Chrome policy
+  (on Windows, an `ExtensionSettings` entry under the Chrome policy registry key) plus a
+  self-hosted update manifest — worth it only to have the extension managed rather than
+  developer-loaded.
+- **Chrome Web Store.** Works everywhere and needs no Developer mode, but it means
+  uploading this code to Google for review and publishing it under your developer
+  account. For a personal tool that drives your own bank session that is a poor trade;
+  the store's unlisted mode still publishes it.
+
 ## Use
 
 1. Log in to the bank yourself in a normal tab.
