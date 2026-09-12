@@ -8,3 +8,9 @@ node_modules/
 .DS_Store
 Thumbs.db
 *.log
+
+# Agent skills fetched by modern-web-guidance. skills-lock.json pins them, so
+# these are restorable with `npx modern-web-guidance@latest update` and are
+# treated like installed dependencies rather than source.
+.agents/
+.claude/skills/
