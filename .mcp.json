@@ -6,7 +6,9 @@
       "args": [
         "chrome-devtools-mcp@latest",
         "--categoryExtensions",
-        "--autoConnect"
+        "--autoConnect",
+        "--no-usage-statistics",
+        "--no-performance-crux"
       ],
       "env": {}
     }
