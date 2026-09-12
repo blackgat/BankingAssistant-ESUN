@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Options Harness</title>
+    <link rel="stylesheet" href="../src/options/options.css" />
+    <style>
+      body { max-width: 1100px; margin: 0 auto; padding: 16px; background: #eef1f4; }
+      .harness-bar {
+        background: #fff; border: 1px solid #e4e7ec; border-radius: 10px;
+        padding: 12px 14px; margin-bottom: 14px; font-size: 12px; color: #667085;
+      }
+      .harness-bar h1 { font-size: 14px; margin: 0 0 6px; color: #0b5d3b; }
+      .harness-bar button { font-size: 12px; padding: 5px 10px; margin-right: 6px; }
+      .panes { display: grid; grid-template-columns: 1fr 340px; gap: 14px; align-items: start; }
+      #options-root { background: #fff; border: 1px solid #e4e7ec; border-radius: 10px; padding: 12px; }
+      #log { background: #0b1021; color: #b7e4c7; padding: 12px; border-radius: 10px;
+             font-size: 11px; max-height: 80vh; overflow: auto; white-space: pre-wrap; }
+      @media (max-width: 900px) { .panes { grid-template-columns: 1fr; } }
+    </style>
+  </head>
+  <body>
+    <div class="harness-bar">
+      <h1>Options Harness — 離線驗證備份 / 還原</h1>
+      <div>
+        用假的 <code>chrome.*</code> API 驅動真正的 options 頁。下載會被攔截並印出內容，
+        <strong>不會寫入任何真實儲存區</strong>。
+      </div>
+      <div style="margin-top:8px;">
+        <button id="seedFull">重設：有設定 + 清單 + 稽核</button>
+        <button id="seedEmpty">重設：全新安裝</button>
+        <button id="dumpState">印出 storage</button>
+        <button id="fillBackup">把目前 storage 當備份貼進文字框</button>
+      </div>
+    </div>
+
+    <div class="panes">
+      <div id="options-root">載入 options 中…</div>
+      <pre id="log">（記錄）</pre>
+    </div>
+    <script type="module" src="options-harness.js"></script>
+  </body>
+</html>

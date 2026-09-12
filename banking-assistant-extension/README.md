@@ -72,6 +72,27 @@ needed to sign a `.crx`); the `key` value in the manifest is a public key.
 Adding, changing, or removing `key` **changes the ID**, which means starting from empty
 storage. Export your settings from the Options page first, then import them back.
 
+## Backup and restore
+
+The Options page has **匯出全部備份** and **還原備份（直接寫入）**. A backup carries
+everything the extension owns — settings, transfer lists, and the audit log — as one
+JSON file.
+
+This matters because the older **匯入設定到表單** button does something different: it
+fills the form and waits for **儲存設定**, and it never covered transfer lists at all.
+A restore writes storage itself and reports back what storage actually holds afterwards,
+rather than what it was handed.
+
+A restore refuses the whole file rather than writing part of it if the JSON is malformed,
+carries nothing restorable, holds a credential-like key anywhere in the tree, or has a
+list without a `jobs` array. It writes only the three keys it owns, so extra keys in a
+file are ignored rather than dropped into storage. It asks for confirmation first,
+naming what is about to be overwritten.
+
+Exercise the whole thing offline with `npm run demo`, then open
+`/demo/options-harness.html`: downloads are intercepted and printed, and storage is
+in-memory, so no real profile is touched.
+
 ## Packaging
 
 ```bash

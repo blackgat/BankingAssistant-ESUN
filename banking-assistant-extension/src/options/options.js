@@ -3,6 +3,13 @@
 // display-name pattern and the masked last 5 digits only.
 
 import { STORAGE_KEYS, DEFAULT_CONFIG, CURRENCY } from "../core/types.js";
+import {
+  BACKUP_KEYS,
+  buildBackup,
+  validateBackup,
+  describeBackup,
+  backupFilename,
+} from "../core/backup.js";
 
 const $ = (id) => document.getElementById(id);
 let config = structuredClone(DEFAULT_CONFIG);
@@ -168,6 +175,48 @@ async function importConfig() {
   }
 }
 
+// Whole-extension backup. "匯入設定 JSON" only fills the form and still needs
+// "儲存設定" pressed afterwards; these two deliberately do not work that way -
+// the restore writes storage itself, because a restore that silently did nothing
+// is exactly the trap worth removing.
+async function exportAll() {
+  const stored = await chrome.storage.local.get([...BACKUP_KEYS]);
+  const backup = buildBackup(stored);
+  const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = backupFilename();
+  a.click();
+  URL.revokeObjectURL(url);
+  setIo(`已下載備份：${describeBackup(backup.data) || "（儲存區是空的）"}`, "ok");
+}
+
+async function importAll() {
+  try {
+    const { data, keys } = validateBackup(JSON.parse($("configArea").value));
+    const ok = confirm(
+      `即將還原：${describeBackup(data)}
+
+` +
+        "這會覆蓋目前的設定與轉帳清單，且無法復原。要繼續嗎？",
+    );
+    if (!ok) {
+      setIo("已取消，未變更任何資料。", "");
+      return;
+    }
+    await chrome.storage.local.set(data);
+    // Report what storage actually holds now, not what we just sent it, so a
+    // write that failed cannot read as success.
+    const back = await chrome.storage.local.get(keys);
+    config = { ...DEFAULT_CONFIG, ...(back[STORAGE_KEYS.CONFIG] ?? {}) };
+    render();
+    setIo(`已還原並寫入：${describeBackup(back)}`, "ok");
+  } catch (err) {
+    setIo(`還原失敗：${err.message}`, "err");
+  }
+}
+
 async function downloadAudit() {
   const r = await chrome.storage.local.get(STORAGE_KEYS.AUDIT_LOG);
   const log = r[STORAGE_KEYS.AUDIT_LOG] || [];
@@ -202,6 +251,8 @@ async function init() {
   $("save").addEventListener("click", save);
   $("exportConfig").addEventListener("click", exportConfig);
   $("importConfig").addEventListener("click", importConfig);
+  $("exportAll").addEventListener("click", exportAll);
+  $("importAll").addEventListener("click", importAll);
   $("downloadAudit").addEventListener("click", downloadAudit);
   $("clearAudit").addEventListener("click", clearAudit);
 }

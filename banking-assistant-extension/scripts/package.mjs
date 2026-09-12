@@ -119,6 +119,53 @@ function collect(pathFromRoot, out = []) {
   return out;
 }
 
+// Resolve a relative specifier against the importing file, staying in ZIP-style
+// forward-slashed paths.
+function resolveSpec(fromFile, spec) {
+  if (!spec.startsWith(".")) return null;
+  const parts = fromFile.split("/").slice(0, -1).concat(spec.split("/"));
+  const out = [];
+  for (const p of parts) {
+    if (p === "" || p === ".") continue;
+    if (p === "..") out.pop();
+    else out.push(p);
+  }
+  return out.join("/");
+}
+
+// Which modules the bank page can actually reach. Walks out from the declared
+// content scripts, following static imports, literal dynamic imports, and the
+// chrome.runtime.getURL() entry the classic loader uses. Only these need to be
+// web-accessible; anything the options or popup page imports is loaded from an
+// extension page and must not be exposed to the bank.
+function reachableFromContentScript(manifest, contents) {
+  const seen = new Set();
+  const queue = [];
+  for (const cs of manifest.content_scripts ?? []) for (const j of cs.js ?? []) queue.push(j);
+
+  const patterns = [
+    /import\s[^;]*?from\s*["']([^"']+)["']/g,  // static, with bindings
+    /import\s*["']([^"']+)["']/g,              // static, side-effect only
+    /import\(\s*["']([^"']+)["']\s*\)/g,       // dynamic, literal specifier
+  ];
+
+  while (queue.length) {
+    const file = queue.shift();
+    if (!file || seen.has(file) || !contents.has(file)) continue;
+    seen.add(file);
+    const src = contents.get(file);
+    for (const re of patterns) {
+      for (const m of src.matchAll(re)) {
+        const resolved = resolveSpec(file, m[1]);
+        if (resolved) queue.push(resolved);
+      }
+    }
+    // The loader hands import() a runtime URL, so the path only appears here.
+    for (const m of src.matchAll(/getURL\(\s*["']([^"']+)["']\s*\)/g)) queue.push(m[1]);
+  }
+  return seen;
+}
+
 // --------------------------------------------------------------- manifest check
 
 // Every path the manifest points at must actually be in the archive. This is the
@@ -145,6 +192,8 @@ function manifestReferences(manifest) {
   return refs.filter((r) => !r.includes("*"));
 }
 
+const cs_css = (m) => (m.content_scripts ?? []).flatMap((cs) => cs.css ?? []);
+
 // ----------------------------------------------------------------------- main
 
 const manifest = JSON.parse(readFileSync(join(ROOT, "manifest.json"), "utf8"));
@@ -158,20 +207,32 @@ if (missing.length) {
   process.exit(1);
 }
 
-// Modules imported dynamically must be web-accessible or the import is blocked.
+// Modules the bank page can reach must be web-accessible, or the dynamic import
+// is blocked at runtime. Modules only reached from the options or popup page
+// must NOT be, so they are not flagged here - and being listed without being
+// reachable is worth knowing too, since it exposes a file to the bank for no
+// reason.
+const contents = new Map(entries.map((e) => [e.name, e.data.toString("utf8")]));
+const reachable = reachableFromContentScript(manifest, contents);
+const declaredEntries = new Set(
+  (manifest.content_scripts ?? []).flatMap((cs) => cs.js ?? []).concat(cs_css(manifest)),
+);
 const war = new Set(
-  (manifest.web_accessible_resources ?? []).flatMap((w) => w.resources ?? [])
+  (manifest.web_accessible_resources ?? []).flatMap((w) => w.resources ?? []),
 );
-const unreachable = [...names].filter(
-  (n) => n.startsWith("src/content/") && n.endsWith(".js") &&
-         n !== manifest.content_scripts?.[0]?.js?.[0] && !war.has(n)
-).concat(
-  [...names].filter((n) => n.startsWith("src/core/") && !war.has(n))
-);
-if (unreachable.length) {
-  console.warn("Warning: shipped but not in web_accessible_resources —");
-  for (const u of unreachable) console.warn(`  ${u}`);
+
+const missingWar = [...reachable].filter((f) => !declaredEntries.has(f) && !war.has(f)).sort();
+if (missingWar.length) {
+  console.warn("Warning: reachable from the content script but not web-accessible —");
+  for (const f of missingWar) console.warn(`  ${f}`);
   console.warn("  A dynamic import() of these will fail inside the bank page.");
+}
+
+const unusedWar = [...war].filter((f) => !reachable.has(f)).sort();
+if (unusedWar.length) {
+  console.warn("Note: web-accessible but not reachable from the content script —");
+  for (const f of unusedWar) console.warn(`  ${f}`);
+  console.warn("  Exposed to the bank page without being needed; consider removing.");
 }
 
 mkdirSync(OUT_DIR, { recursive: true });

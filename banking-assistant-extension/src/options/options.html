@@ -66,14 +66,23 @@
       </div>
 
       <section class="card">
-        <h2>匯入 / 匯出 / 稽核紀錄</h2>
+        <h2>備份 / 還原</h2>
+        <div class="actions">
+          <button id="exportAll" class="primary">匯出全部備份</button>
+          <button id="importAll" class="primary">還原備份（直接寫入）</button>
+        </div>
+        <p class="hint">
+          備份包含設定、轉帳清單與稽核紀錄。還原會直接覆蓋儲存區，不需要再按「儲存設定」。
+        </p>
+
+        <h2>設定 / 稽核紀錄</h2>
         <div class="actions">
           <button id="exportConfig" class="ghost">匯出設定 JSON</button>
-          <button id="importConfig" class="ghost">匯入設定 JSON</button>
+          <button id="importConfig" class="ghost">匯入設定到表單</button>
           <button id="downloadAudit" class="ghost">下載稽核紀錄 (JSONL)</button>
           <button id="clearAudit" class="danger">清除稽核紀錄</button>
         </div>
-        <textarea id="configArea" rows="6" placeholder="在此貼上設定 JSON 後按「匯入設定 JSON」"></textarea>
+        <textarea id="configArea" rows="6" placeholder="貼上備份 JSON 後按「還原備份」，或貼上設定 JSON 後按「匯入設定到表單」"></textarea>
         <p id="ioStatus" class="status"></p>
       </section>
     </main>
