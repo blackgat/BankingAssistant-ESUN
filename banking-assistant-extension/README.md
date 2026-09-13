@@ -260,3 +260,17 @@ in `main.module.js`). Details in the E.SUN notes, section 1.
 
 No cross-bank generic adapter, no OTP handling, no password-manager integration,
 no final-submit click, no cloud sync, no raw DOM upload.
+
+## Licence
+
+MIT — see [LICENSE](../LICENSE) at the repository root.
+
+The licence grants permission; it is not a recommendation. This extension is
+written for one person, one bank, and one set of accounts, and the project's own
+position is that **you should not install it** — see the closing section of
+[`docs/safe-by-construction.html`](docs/safe-by-construction.html) for why.
+
+What is offered for reuse is the design: splitting the work at the point of no
+return, omitting the dangerous action instead of guarding it, treating only the
+bank's own completion page as proof, and storing the least that still identifies
+an account. Take those. The E.SUN selectors will only mislead you.
