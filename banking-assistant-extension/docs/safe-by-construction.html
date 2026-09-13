@@ -1,0 +1,513 @@
+<title>拆掉那顆按鈕</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@600;700&display=swap">
+
+<style>
+  /* Complete light palette. Neutrals carry a slight blue bias so they read as
+     chosen rather than inherited; the single ochre is reserved for the boundary
+     the whole piece is about. */
+  :root {
+    --paper:      #F5F4F1;
+    --surface:    #FFFFFF;
+    --ink:        #15181E;
+    --ink-soft:   #565F6E;
+    --ink-faint:  #8B93A1;
+    --rule:       #DEDBD4;
+    --deep:       #1E3A5F;
+    --line:       #B5721A;
+    --line-wash:  #F5E9D6;
+    --paper-fig:  #FAF9F6;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper:     #101319;
+      --surface:   #171B23;
+      --ink:       #E9EBEF;
+      --ink-soft:  #A2ABBA;
+      --ink-faint: #6E7787;
+      --rule:      #262C37;
+      --deep:      #8FB4DC;
+      --line:      #E0A64B;
+      --line-wash: #2A2213;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper:     #101319;
+    --surface:   #171B23;
+    --ink:       #E9EBEF;
+    --ink-soft:  #A2ABBA;
+    --ink-faint: #6E7787;
+    --rule:      #262C37;
+    --deep:      #8FB4DC;
+    --line:      #E0A64B;
+    --line-wash: #2A2213;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: "IBM Plex Sans", "Noto Sans TC", system-ui, "Microsoft JhengHei", sans-serif;
+    font-size: 17px;
+    line-height: 1.9;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 24px 120px; }
+  .col  { max-width: 34rem; margin: 0 auto; }
+
+  h1, h2, h3 {
+    font-family: Fraunces, "Noto Serif TC", Georgia, serif;
+    text-wrap: balance;
+    margin: 0;
+    letter-spacing: -0.01em;
+  }
+
+  /* ---- opening ---- */
+  header { padding: 88px 0 40px; }
+  .eyebrow {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 12px;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: var(--line);
+    margin: 0 0 20px;
+  }
+  h1 { font-size: clamp(40px, 7vw, 68px); font-weight: 700; line-height: 1.1; }
+  .standfirst {
+    font-size: 20px;
+    line-height: 1.75;
+    color: var(--ink-soft);
+    margin: 24px 0 0;
+  }
+  .byline {
+    margin-top: 32px; padding-top: 20px;
+    border-top: 1px solid var(--rule);
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 12.5px;
+    color: var(--ink-faint);
+    display: flex; flex-wrap: wrap; gap: 6px 22px;
+  }
+
+  p { margin: 0 0 1.35em; }
+  .col > p:last-child { margin-bottom: 0; }
+  strong { font-weight: 700; color: var(--ink); }
+
+  section { padding: 44px 0; }
+  h2 { font-size: clamp(26px, 3.6vw, 34px); font-weight: 600; margin-bottom: 18px; }
+
+  /* The four moves each open with the same ochre stop-bar the tool's own mark
+     uses. It is the piece's one recurring device and it means something. */
+  .move > h2 {
+    position: relative;
+    padding-left: 22px;
+  }
+  .move > h2::before {
+    content: "";
+    position: absolute; left: 0; top: .18em; bottom: .18em;
+    width: 5px; border-radius: 3px;
+    background: var(--line);
+  }
+  .move .kicker {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 12px; letter-spacing: .14em; text-transform: uppercase;
+    color: var(--ink-faint);
+    margin: 0 0 8px 22px;
+  }
+
+  /* ---- pull quote ---- */
+  .pull {
+    font-family: Fraunces, "Noto Serif TC", Georgia, serif;
+    font-size: clamp(23px, 3.2vw, 30px);
+    line-height: 1.5;
+    font-weight: 600;
+    color: var(--deep);
+    margin: 8px auto 8px;
+    max-width: 30rem;
+    text-wrap: balance;
+  }
+
+  /* ---- figures ----
+     Figures sit on a fixed light ground in both themes: the artifact host
+     renders mermaid with its own theme, and a fixed panel keeps diagram ink
+     legible however the page is viewed. */
+  figure {
+    margin: 34px auto;
+    max-width: 46rem;
+    background: var(--paper-fig);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    padding: 26px 22px 18px;
+    overflow-x: auto;
+  }
+  figure svg { display: block; margin: 0 auto; max-width: 100%; height: auto; }
+  figure .mermaid { display: flex; justify-content: center; }
+  figcaption {
+    margin-top: 18px; padding-top: 14px;
+    border-top: 1px solid #E3E0D8;
+    font-size: 13.5px; line-height: 1.65;
+    color: #5A6270;
+    text-align: left;
+  }
+  /* mermaid v11 styles sequence participant labels with the box fill, which
+     makes them vanish; that rule is id-scoped so only !important beats it. */
+  figure .mermaid svg text.actor,
+  figure .mermaid svg text.actor tspan { fill: #15181E !important; }
+
+  /* ---- cost table ---- */
+  .tablewrap { max-width: 46rem; margin: 26px auto; border: 1px solid var(--rule); border-radius: 4px; background: var(--surface); overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 15px; }
+  th, td { text-align: left; padding: 13px 18px; border-bottom: 1px solid var(--rule); vertical-align: top; line-height: 1.7; }
+  th { font-weight: 600; background: color-mix(in srgb, var(--rule) 30%, transparent); white-space: nowrap; }
+  tr:last-child td { border-bottom: none; }
+
+  .note {
+    max-width: 34rem; margin: 26px auto;
+    background: var(--line-wash);
+    border-left: 4px solid var(--line);
+    padding: 16px 20px;
+    font-size: 15.5px; line-height: 1.75;
+    color: var(--ink-soft);
+  }
+  .note strong { color: var(--ink); }
+
+  footer {
+    max-width: 34rem; margin: 60px auto 0; padding-top: 22px;
+    border-top: 1px solid var(--rule);
+    font-size: 14px; color: var(--ink-faint); line-height: 1.7;
+  }
+
+  code {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: .87em;
+    background: color-mix(in srgb, var(--rule) 40%, transparent);
+    padding: .12em .4em; border-radius: 3px;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    a { transition: color .15s ease; }
+  }
+  a { color: var(--deep); text-underline-offset: 3px; }
+  a:focus-visible { outline: 2px solid var(--line); outline-offset: 3px; }
+</style>
+
+<div class="wrap">
+
+  <header class="col">
+    <p class="eyebrow">設計筆記</p>
+    <h1>拆掉那顆按鈕</h1>
+    <p class="standfirst">
+      我寫了一個小工具，幫我在網路銀行上把每月固定的幾筆轉帳填好。
+      它會選帳戶、填金額、填備註 —— 然後停下來，等我。<br><br>
+      「停下來」這件事，才是整個設計唯一重要的地方。
+    </p>
+    <div class="byline">
+      <span>關於高後果動作的自動化</span>
+      <span>約 6 分鐘</span>
+    </div>
+  </header>
+
+  <section class="col">
+    <p>
+      轉帳按下去就收不回來。而任何會自動做事的東西，都有做錯的一天 ——
+      網頁改版、選錯了某個欄位、判斷成功判斷得太早。
+    </p>
+    <p>
+      面對這種事，最直覺的做法是<strong>更小心</strong>：多加幾層檢查、多問一次、多寫一些測試。
+      這些都該做，但它們有個共通的弱點 —— 小心是一種<strong>承諾</strong>，不是一種<strong>保證</strong>。
+      承諾會在你沒想到的那條路徑上失效，而你不知道那條路徑在哪，正是因為你沒想到它。
+    </p>
+    <p class="pull">
+      換個問題會好很多：能不能讓它就算想做錯，也做不到？
+    </p>
+    <p>
+      這篇講四個很小的決定。它們都不聰明，甚至有點笨 —— 但笨得剛好，
+      因為它們把「不會出錯」從一件要靠紀律維持的事，變成一件<strong>結構上就發生不了</strong>的事。
+    </p>
+  </section>
+
+  <section class="col">
+    <h2>先把工作切成兩半</h2>
+    <p>
+      填表格很煩，但填錯了可以改。按下確認很快，但按錯了改不了。
+      這兩件事的性質完全不同，卻常常被當成同一個流程的前後兩步。
+    </p>
+    <p>
+      所以第一件事是把它們切開：<strong>機器做可以反悔的部分，人做不能反悔的部分。</strong>
+    </p>
+  </section>
+
+  <figure>
+    <svg viewBox="0 0 700 190" role="img" aria-label="準備工作由機器做、授權由人做，中間隔著一條不能由機器跨過的界線">
+      <defs>
+        <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <polygon points="0,1 9,5 0,9" fill="#5A6270"/>
+        </marker>
+      </defs>
+
+      <rect x="14" y="38" width="250" height="104" rx="5" fill="#FFFFFF" stroke="#C9C5BC" stroke-width="1.5"/>
+      <text x="139" y="76" text-anchor="middle" font-family="'Noto Serif TC',serif" font-size="17" font-weight="600" fill="#15181E">機器做的</text>
+      <text x="139" y="103" text-anchor="middle" font-family="'Noto Sans TC',sans-serif" font-size="13" fill="#5A6270">挑帳戶、填金額、填備註</text>
+      <text x="139" y="124" text-anchor="middle" font-family="'Noto Sans TC',sans-serif" font-size="12.5" fill="#8B93A1">填錯了可以改</text>
+
+      <path d="M272 90 H326" stroke="#5A6270" stroke-width="1.6" fill="none" marker-end="url(#ar)"/>
+
+      <rect x="338" y="24" width="14" height="132" rx="7" fill="#B5721A"/>
+      <text x="345" y="176" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="11.5" fill="#B5721A">界線</text>
+
+      <rect x="382" y="38" width="250" height="104" rx="5" fill="#FFFFFF" stroke="#C9C5BC" stroke-width="1.5"/>
+      <text x="507" y="76" text-anchor="middle" font-family="'Noto Serif TC',serif" font-size="17" font-weight="600" fill="#15181E">只有人能做的</text>
+      <text x="507" y="103" text-anchor="middle" font-family="'Noto Sans TC',sans-serif" font-size="13" fill="#5A6270">核對，然後按下確認</text>
+      <text x="507" y="124" text-anchor="middle" font-family="'Noto Sans TC',sans-serif" font-size="12.5" fill="#8B93A1">按錯了改不了</text>
+
+      <text x="656" y="95" font-family="'Noto Sans TC',sans-serif" font-size="13" fill="#B5721A">停</text>
+    </svg>
+    <figcaption>
+      機器把流程推到界線前面就停住。它不是「被要求不要越過」，而是接下來會看到的 ——
+      它手上根本沒有能越過去的工具。
+    </figcaption>
+  </figure>
+
+  <section class="col move">
+    <p class="kicker">第一個決定</p>
+    <h2>不是把按鈕貼起來，是根本沒做那顆按鈕</h2>
+    <p>
+      想像一台電視遙控器。你不希望小孩按到「回復原廠設定」，
+      你可以在那顆按鈕上貼一塊膠帶 —— 但膠帶會掉，而且按鈕還在。
+    </p>
+    <p>
+      另一個做法是：<strong>做這台遙控器的時候，就沒有把那顆按鈕做上去。</strong>
+      不是禁止，是不存在。
+    </p>
+    <p>
+      這個工具就是這樣。它能做的動作是一張寫死的清單 —— 填金額、選收款人、讀餘額之類。
+      清單以外的任何要求，一律拒絕。而「按下最終確認」「填簡訊驗證碼」這些名字，
+      從來沒有被實作出來，程式裡找不到對應的東西。
+    </p>
+  </section>
+
+  <figure>
+    <svg viewBox="0 0 560 250" role="img" aria-label="可執行動作是一張封閉清單，清單以外的要求一律拒絕，最終確認與驗證碼從未被實作">
+      <rect x="60" y="18" width="200" height="214" rx="10" fill="#FFFFFF" stroke="#C9C5BC" stroke-width="1.5"/>
+      <text x="160" y="46" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="11.5" letter-spacing="1" fill="#8B93A1">能做的</text>
+
+      <rect x="82" y="60" width="156" height="30" rx="15" fill="#EEF1F4" stroke="#C9C5BC"/>
+      <text x="160" y="80" text-anchor="middle" font-family="'Noto Sans TC',sans-serif" font-size="13" fill="#15181E">填金額</text>
+      <rect x="82" y="98" width="156" height="30" rx="15" fill="#EEF1F4" stroke="#C9C5BC"/>
+      <text x="160" y="118" text-anchor="middle" font-family="'Noto Sans TC',sans-serif" font-size="13" fill="#15181E">選收款人</text>
+      <rect x="82" y="136" width="156" height="30" rx="15" fill="#EEF1F4" stroke="#C9C5BC"/>
+      <text x="160" y="156" text-anchor="middle" font-family="'Noto Sans TC',sans-serif" font-size="13" fill="#15181E">讀餘額</text>
+
+      <rect x="82" y="182" width="156" height="32" rx="6" fill="none" stroke="#C9C5BC" stroke-width="1.5" stroke-dasharray="5 4"/>
+      <text x="160" y="203" text-anchor="middle" font-family="'Noto Sans TC',sans-serif" font-size="12.5" fill="#8B93A1">（就這些）</text>
+
+      <path d="M300 125 h48" stroke="#5A6270" stroke-width="1.5" fill="none"/>
+      <text x="324" y="116" text-anchor="middle" font-family="'Noto Sans TC',sans-serif" font-size="12" fill="#5A6270">其他一律</text>
+      <text x="324" y="148" text-anchor="middle" font-family="'Noto Sans TC',sans-serif" font-size="13" font-weight="500" fill="#B5721A">拒絕</text>
+
+      <rect x="364" y="76" width="182" height="98" rx="6" fill="#F5E9D6" stroke="#B5721A" stroke-width="1.5"/>
+      <text x="455" y="106" text-anchor="middle" font-family="'Noto Sans TC',sans-serif" font-size="13.5" fill="#15181E">按下最終確認</text>
+      <text x="455" y="132" text-anchor="middle" font-family="'Noto Sans TC',sans-serif" font-size="13.5" fill="#15181E">填驗證碼</text>
+      <text x="455" y="158" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="11" fill="#B5721A">從未被做出來</text>
+    </svg>
+    <figcaption>
+      右邊那格不是「被關掉的功能」，而是空的 —— 沒有任何程式碼實作它們。
+      測試會去掃過所有方法的名字，只要出現可疑的名稱就讓測試失敗。
+    </figcaption>
+  </figure>
+
+  <section class="col move">
+    <p class="kicker">第二個決定</p>
+    <h2>只認收據，不認「應該好了吧」</h2>
+    <p>
+      工具怎麼知道一筆轉帳成功了？
+    </p>
+    <p>
+      有些很誘人的判斷方式：按鈕點下去了、等了十秒了、網址變了。
+      這些都是<strong>推測</strong>。推測在順利的時候都對，在出事的時候全錯 ——
+      而你需要它答對的，正是出事那次。
+    </p>
+    <p>
+      所以這裡只接受一種證據：<strong>真的看到銀行自己的「交易結果」畫面。</strong>
+      就像包裹送到不是因為「寄出很久了」，而是因為你手上有那張簽收單。
+    </p>
+  </section>
+
+  <figure>
+    <pre class="mermaid">
+%%{init: {'theme':'base','themeVariables':{'fontFamily':'Noto Sans TC, sans-serif','primaryColor':'#EEF1F4','primaryTextColor':'#15181E','primaryBorderColor':'#5A6270','lineColor':'#3A424E','textColor':'#15181E','mainBkg':'#EEF1F4','nodeBorder':'#5A6270','edgeLabelBackground':'#FAF9F6','transitionColor':'#3A424E','labelColor':'#15181E','altBackground':'#FFFFFF'}}}%%
+stateDiagram-v2
+  direction LR
+  [*] --> 等你授權
+  等你授權 --> 已完成: 看到銀行的交易結果畫面
+  已完成 --> [*]
+    </pre>
+    <figcaption>
+      整張狀態圖裡，通往「已完成」只有這一條路。沒有任何事件能因為時間到了、
+      或因為誰點了什麼，就讓它往前走。測試會逐一走訪所有可能的轉移來確認這件事。
+    </figcaption>
+  </figure>
+
+  <section class="col move">
+    <p class="kicker">第三個決定</p>
+    <h2>用尺量，不用眼睛估</h2>
+    <p>
+      每一筆轉出去之前，工具會檢查幾件事：金額有沒有超過上限、餘額夠不夠、
+      畫面上顯示的收款人是不是你要的那個。
+    </p>
+    <p>
+      這些檢查全部是<strong>算出來的</strong>，不是<strong>判斷出來的</strong>。
+      同樣的輸入永遠得到同樣的答案，不呼叫任何模型，也不連網路。
+    </p>
+    <p>
+      差別在於可預測性。一把尺你可以先量量看它準不準；
+      一個會「看情況」的判斷，你只能等它出錯那天才知道它會怎麼錯。
+    </p>
+    <div class="note">
+      <strong>一個真實的細節：</strong>銀行的確認頁會把半形英數轉成全形顯示，
+      所以比對備註時得先把兩邊都正規化。這種事沒有「大致上對」—— 要嘛相符，要嘛停下來。
+    </div>
+  </section>
+
+  <figure>
+    <pre class="mermaid">
+%%{init: {'theme':'base','themeVariables':{'fontFamily':'Noto Sans TC, sans-serif','primaryColor':'#EEF1F4','primaryTextColor':'#15181E','primaryBorderColor':'#5A6270','lineColor':'#3A424E','textColor':'#15181E','mainBkg':'#EEF1F4','nodeBorder':'#5A6270','edgeLabelBackground':'#FAF9F6'}}}%%
+flowchart LR
+  A["這一筆"] --> B{"畫面上的收款人<br/>和金額，<br/>跟這筆一樣嗎？"}
+  B -- "一樣" --> C["停下來，等你"]
+  B -- "不一樣" --> D["整批停止"]
+    </pre>
+    <figcaption>
+      不相符就停止整批，不是跳過這筆繼續跑。讀不到、或讀出來有兩種可能，同樣算不相符。
+    </figcaption>
+  </figure>
+
+  <section class="col move">
+    <p class="kicker">第四個決定</p>
+    <h2>記不住的東西，最安全</h2>
+    <p>
+      工具不需要知道你的密碼 —— 登入是你自己做的。
+      它也不需要知道完整帳號 —— 它只要能認出「畫面上這個是不是我要的那個」。
+    </p>
+    <p>
+      所以它只留末五碼和遮罩過的名字。
+      就像問路的人不需要知道你家門牌幾號，知道哪一條街就夠了。
+    </p>
+    <p>
+      這不只是隱私考量。<strong>沒存下來的東西，不會外洩、不會被誤印在畫面上、
+      也不會在你匯出紀錄時跟著跑出去。</strong>
+    </p>
+  </section>
+
+  <figure>
+    <svg viewBox="0 0 620 160" role="img" aria-label="從銀行頁面讀到的值只保留末五碼與遮罩後的名字，密碼與驗證碼完全不儲存">
+      <defs>
+        <marker id="ar2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <polygon points="0,1 9,5 0,9" fill="#5A6270"/>
+        </marker>
+      </defs>
+
+      <rect x="12" y="46" width="150" height="66" rx="5" fill="#FFFFFF" stroke="#C9C5BC" stroke-width="1.5"/>
+      <text x="87" y="74" text-anchor="middle" font-family="'Noto Sans TC',sans-serif" font-size="13.5" fill="#15181E">頁面上讀到的</text>
+      <text x="87" y="96" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="12" fill="#8B93A1">完整內容</text>
+
+      <path d="M170 79 H212" stroke="#5A6270" stroke-width="1.6" fill="none" marker-end="url(#ar2)"/>
+
+      <rect x="224" y="34" width="150" height="90" rx="5" fill="#F5E9D6" stroke="#B5721A" stroke-width="1.5"/>
+      <text x="299" y="66" text-anchor="middle" font-family="'Noto Serif TC',serif" font-size="15" font-weight="600" fill="#15181E">篩一遍</text>
+      <text x="299" y="90" text-anchor="middle" font-family="'Noto Sans TC',sans-serif" font-size="12.5" fill="#5A6270">只留認得出來</text>
+      <text x="299" y="109" text-anchor="middle" font-family="'Noto Sans TC',sans-serif" font-size="12.5" fill="#5A6270">所需的最少部分</text>
+
+      <path d="M382 79 H424" stroke="#5A6270" stroke-width="1.6" fill="none" marker-end="url(#ar2)"/>
+
+      <rect x="436" y="46" width="172" height="66" rx="5" fill="#FFFFFF" stroke="#C9C5BC" stroke-width="1.5"/>
+      <text x="522" y="74" text-anchor="middle" font-family="'IBM Plex Mono',monospace" font-size="13" fill="#15181E">****74647</text>
+      <text x="522" y="96" text-anchor="middle" font-family="'Noto Sans TC',sans-serif" font-size="12.5" fill="#8B93A1">張** · 202****388</text>
+
+      <text x="299" y="146" text-anchor="middle" font-family="'Noto Sans TC',sans-serif" font-size="12.5" fill="#B5721A">密碼與驗證碼：連篩都不用，從頭到尾不碰</text>
+    </svg>
+    <figcaption>
+      遮罩發生在存進去之前，不是顯示之前。存下來的就已經是遮罩過的版本了。
+    </figcaption>
+  </figure>
+
+  <section class="col">
+    <h2>代價</h2>
+    <p>
+      這樣設計是有成本的，而且成本不小。誠實地列出來：
+    </p>
+  </section>
+
+  <div class="tablewrap">
+    <table>
+      <tr>
+        <th>你失去的</th>
+        <th>你換到的</th>
+      </tr>
+      <tr>
+        <td>不能真的全自動。每一筆都得有人在場按確認</td>
+        <td>不會有「半夜自己轉出去」這種事</td>
+      </tr>
+      <tr>
+        <td>慢。四筆轉帳花了九分鐘</td>
+        <td>那九分鐘裡有四次人為核對</td>
+      </tr>
+      <tr>
+        <td>綁死一家銀行。對方改版就得修</td>
+        <td>壞掉的方式是停下來，不是做錯事</td>
+      </tr>
+    </table>
+  </div>
+
+  <section class="col">
+    <p>
+      如果你要的是「設定好就不用管」，這個設計不適合你 ——
+      而且我會建議你重新想一下，你是不是真的想要那個。
+    </p>
+  </section>
+
+  <section class="col">
+    <h2>什麼時候值得這樣做</h2>
+    <p>
+      不是每件事都需要。改一個標題、寄一封內部通知、跑一次報表 ——
+      做錯了重來就是，這種事上面這四個決定只會拖慢你。
+    </p>
+    <p>
+      判斷的標準只有一個：<strong>做錯了之後，能不能靠自己收回來？</strong>
+    </p>
+    <p>
+      收得回來的，放手讓它跑。收不回來的 —— 轉帳、寄出、刪除、發布 ——
+      就把那個動作從工具手上拿走。不是叮嚀它小心，是讓它做不到。
+    </p>
+    <p class="pull">
+      最可靠的保護，是那條路徑根本不存在。
+    </p>
+  </section>
+
+  <footer class="col">
+    文中的工具是我自己每月轉帳用的，跑在自己的機器上、只對自己的帳戶。
+    它<strong>不適合發布給別人使用</strong> —— 綁死單一銀行、
+    清單送出後不會清空（我知道，別人不知道），而且自動化操作網銀多半牴觸銀行的約定條款。
+    值得分享的是上面這四個決定，不是那個套件。
+  </footer>
+
+</div>
+
+<script type="module">
+  // Artifacts render <pre class="mermaid"> natively. Outside that host — opened
+  // from a dev server or a file — pull mermaid in so the two diagrams still draw.
+  const drawn = () => [...document.querySelectorAll("pre.mermaid")].some((b) => b.querySelector("svg"));
+  await new Promise((r) => setTimeout(r, 300));
+  if (!location.hostname.endsWith("claude.ai") && !drawn()) {
+    try {
+      const { default: mermaid } = await import("https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs");
+      mermaid.initialize({ startOnLoad: false, theme: "base" });
+      await mermaid.run({ querySelector: "pre.mermaid" });
+    } catch {
+      // The diagram source stays readable as text if the CDN is unreachable.
+    }
+  }
+</script>
