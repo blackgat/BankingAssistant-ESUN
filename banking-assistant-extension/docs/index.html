@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>拆掉那顆按鈕 — 設計筆記</title>
+<meta name="description" content="一個自用的網銀轉帳工具，以及它為什麼按不下確認鍵。公開是為了設計，不是為了安裝。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@600;700&display=swap">
+<style>
+  :root {
+    --paper:     #F5F4F1;
+    --surface:   #FFFFFF;
+    --ink:       #15181E;
+    --ink-soft:  #565F6E;
+    --ink-faint: #8B93A1;
+    --rule:      #DEDBD4;
+    --deep:      #1E3A5F;
+    --line:      #B5721A;
+    --line-wash: #F5E9D6;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper:     #101319;
+      --surface:   #171B23;
+      --ink:       #E9EBEF;
+      --ink-soft:  #A2ABBA;
+      --ink-faint: #6E7787;
+      --rule:      #262C37;
+      --deep:      #8FB4DC;
+      --line:      #E0A64B;
+      --line-wash: #2A2213;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: "IBM Plex Sans", "Noto Sans TC", system-ui, "Microsoft JhengHei", sans-serif;
+    font-size: 17px;
+    line-height: 1.85;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 36rem; margin: 0 auto; padding: 76px 24px 90px; }
+
+  .eyebrow {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 12px; letter-spacing: .16em; text-transform: uppercase;
+    color: var(--line); margin: 0 0 18px;
+  }
+  h1 {
+    font-family: Fraunces, "Noto Serif TC", Georgia, serif;
+    font-size: clamp(34px, 6vw, 52px); font-weight: 700; line-height: 1.12;
+    margin: 0; letter-spacing: -.01em; text-wrap: balance;
+  }
+  .lede { font-size: 18px; color: var(--ink-soft); margin: 20px 0 0; }
+
+  .reads { display: flex; flex-direction: column; gap: 14px; margin: 44px 0 0; }
+  a.read {
+    display: block; text-decoration: none; color: inherit;
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-left: 4px solid var(--line);
+    border-radius: 3px;
+    padding: 20px 22px;
+  }
+  a.read:hover, a.read:focus-visible { border-color: var(--deep); border-left-color: var(--line); }
+  a.read:focus-visible { outline: 2px solid var(--line); outline-offset: 3px; }
+  .read h2 {
+    font-family: Fraunces, "Noto Serif TC", Georgia, serif;
+    font-size: 21px; font-weight: 600; margin: 0 0 6px;
+  }
+  .read p { margin: 0; font-size: 15px; line-height: 1.7; color: var(--ink-soft); }
+
+  .caveat {
+    margin: 40px 0 0;
+    background: var(--line-wash);
+    border-left: 4px solid var(--line);
+    padding: 18px 22px;
+    font-size: 15.5px; line-height: 1.75; color: var(--ink-soft);
+  }
+  .caveat strong { color: var(--ink); }
+
+  footer {
+    margin: 44px 0 0; padding-top: 20px;
+    border-top: 1px solid var(--rule);
+    font-size: 14px; color: var(--ink-faint);
+    display: flex; flex-wrap: wrap; gap: 8px 20px;
+  }
+  footer a { color: var(--deep); text-underline-offset: 3px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <p class="eyebrow">設計筆記</p>
+  <h1>拆掉那顆按鈕</h1>
+  <p class="lede">
+    我寫了一個小工具，幫我在網路銀行上把每月固定的幾筆轉帳填好 ——
+    然後停下來，等我按確認。它按不下去，因為程式裡沒有那條路徑。
+  </p>
+
+  <div class="reads">
+    <a class="read" href="safe-by-construction.html">
+      <h2>拆掉那顆按鈕</h2>
+      <p>
+        四個很小的決定，讓一個會動你的錢的工具就算想做錯也做不到。
+        用比喻講，不需要看過程式碼。約 6 分鐘。
+      </p>
+    </a>
+    <a class="read" href="architecture.html">
+      <h2>轉帳輔助架構圖解</h2>
+      <p>
+        同一套東西的工程視角：元件、批次流程、狀態機、政策關卡與遮罩。
+        八張圖，給想看實作的人。
+      </p>
+    </a>
+  </div>
+
+  <div class="caveat">
+    <strong>這個套件不該被安裝。</strong>
+    它是為一個人、一家銀行、一組帳戶寫的。清單送出後不會清空——我知道，別人不知道；
+    而且自動化操作網銀多半牴觸銀行的約定條款。
+    開放出來的是上面那四個決定，不是那個工具。
+  </div>
+
+  <footer>
+    <span><a href="https://github.com/blackgat/BankingAssistant-ESUN">原始碼與 DOM 筆記（GitHub）</a></span>
+    <span>MIT</span>
+  </footer>
+
+</div>
+</body>
+</html>
