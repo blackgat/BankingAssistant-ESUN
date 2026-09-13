@@ -1,0 +1,37 @@
+# The pages live in banking-assistant-extension/docs, which branch-based Pages
+# cannot reach — it only offers the repository root or a root-level /docs. This
+# uploads that directory as the Pages artifact instead, so the docs stay next to
+# the extension they describe.
+name: Deploy docs to Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "banking-assistant-extension/docs/**"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: banking-assistant-extension/docs
+      - id: deployment
+        uses: actions/deploy-pages@v4
