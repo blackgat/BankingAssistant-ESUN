@@ -77,10 +77,12 @@ async function startBatch(batch, listId) {
   }
 }
 
-// Is THIS frame the one hosting the logged-in banking app? With all_frames
-// enabled the content script runs in every frame (the bank serves its UI inside
-// a same-origin iframe), so we use this to let only the right frame act.
-async function thisFrameIsBankApp() {
+// Is this page the logged-in banking app? Until E.SUN's 2026-10-17 redesign
+// this also picked the right frame, because the app lived in a same-origin
+// iframe and the content script ran in all of them. There are no iframes now,
+// so what is left is the part that always mattered: act only on an allowed
+// origin, and only when a session is actually signed in.
+async function pageIsBankApp() {
   const config = await loadConfig();
   if (!isOriginAllowed(location.origin, config)) return false;
   return createAdapter(config, document).detectLoginState() === LOGIN_STATES.LOGGED_IN;
@@ -115,22 +117,22 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (!msg || typeof msg !== "object") return;
   switch (msg.type) {
     case "PING":
-      // Only the banking-app frame claims the PING so the popup learns the right
-      // frame is ready; other frames stay silent.
-      thisFrameIsBankApp().then((ok) => {
+      // Answer only from an allowed, signed-in page, so the popup does not take
+      // silence for readiness.
+      pageIsBankApp().then((ok) => {
         if (ok) sendResponse({ ok: true, origin: location.origin });
       });
       return true; // async
     case "START_BATCH":
-      // Every frame receives this; only the banking-app frame handles it so the
-      // empty top frame never answers with a misleading "not logged in".
-      thisFrameIsBankApp().then((ok) => {
+      // Refuse to start a batch unless the origin is allowed and a session is
+      // signed in.
+      pageIsBankApp().then((ok) => {
         if (ok) startBatch(msg.batch, msg.listId).then(sendResponse);
       });
       return true; // async
     case "DRY_RUN_FILL":
-      // Only the banking-app frame fills the form; it never advances/confirms.
-      thisFrameIsBankApp().then((ok) => {
+      // Fills the open form; never advances or confirms.
+      pageIsBankApp().then((ok) => {
         if (ok) runDryRunFill(msg.opts || {}).then(sendResponse);
       });
       return true; // async
@@ -189,10 +191,9 @@ globalThis.__bankingAssistant = {
     return runDryRunFill(opts);
   },
 };
-// With all_frames enabled this module runs in every frame the bank serves, so
-// announce readiness only from the frame that actually hosts the banking app —
-// otherwise one page load prints this a dozen times into the user's console.
-thisFrameIsBankApp().then((isBankApp) => {
+// Announce readiness only on the banking app itself, not on every page the
+// host serves.
+pageIsBankApp().then((isBankApp) => {
   if (isBankApp) {
     console.info("[BankingAssistant] content script ready. Try: await __bankingAssistant.pageState()");
   }

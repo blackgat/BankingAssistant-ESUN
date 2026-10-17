@@ -224,12 +224,13 @@ Everything beyond installing and running lives in [`docs/`](docs/):
 manifest content script is a classic loader that `import()`s the ESM entry; those
 files are listed in `web_accessible_resources`. The service worker is `type: module`.
 
-**Why `all_frames: true` is enabled (SPEC 3.3).** E.SUN serves its entire banking
-app inside a same-origin iframe, so a top-frame-only content script sees an empty
-shell and `detectLoginState()` fails. With `all_frames: true` the content script
-also runs inside that iframe; `START_BATCH` is broadcast to every frame but only
-the one whose `detectLoginState()` is `logged_in` acts on it (`thisFrameIsBankApp()`
-in `main.module.js`). Details in the E.SUN notes, section 1.
+**`all_frames` was removed on 2026-10-17.** It existed because E.SUN served its
+banking app inside a same-origin iframe, which left a top-frame-only content
+script looking at an empty shell. The redesign has no iframes, so injecting into
+every frame would widen the surface for nothing. The guard it was paired with
+survives under a truer name — `pageIsBankApp()` in `main.module.js` — because its
+real job was never the frame: it refuses to act unless the origin is allowed and
+a session is signed in. Details in the E.SUN notes, section 11.
 
 ## How the boundary is enforced
 
