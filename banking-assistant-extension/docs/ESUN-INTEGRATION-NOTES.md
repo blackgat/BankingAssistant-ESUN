@@ -397,9 +397,26 @@ existing matching rules carry over unchanged. The sequence for the rewrite is
 Setting the input's `.value` directly will not work: it is `readOnly` and the app
 holds the real state.
 
-**Unknown, and it matters:** the dialog exposed no close control — the probe found
-no button, `[class*=close]`, or close-labelled element inside it. So how the adapter
-*backs out* when no row matches is unresolved. A picker that opens and cannot be
-dismissed would leave the page wedged mid-batch. Find the dismissal path (Escape,
-a click outside, a header control) before writing the selection step, and treat
-"opened the picker but found no match" as a stop that also closes the dialog.
+**Dismissal.** The close control is in the header:
+
+```html
+<button class="toggle mib-hover" aria-label="關閉"></button>
+```
+
+It carries no text, so match it on `aria-label="關閉"` within `.modal-header`.
+**Escape does not close the dialog** (confirmed 2026-10-17), so the adapter has to
+click that button; it cannot rely on a key press. Treat "opened the picker, no row
+matched" as a stop that closes the dialog first, and keep re-navigating to the
+`/edit` route as the fallback if the close ever fails — a fresh page load is the
+one recovery that does not depend on finding an affordance.
+
+> **The picker is not reliably present the instant it opens.** An earlier probe in
+> the same session queried `.combo-modal` while the picker was open on screen and
+> got **nothing back**; a later probe found it visible, `display: flex`, 1060x398,
+> with all six rows. The dialog is re-rendered rather than merely shown, so a
+> single `querySelector` can miss it.
+>
+> This is the same shape as the bug that produced "無法進入轉帳表單頁" on the second
+> job of a batch: a transient absence read as a hard fact. Every wait against this
+> app has to poll until a deadline, and treat "not found yet" as *keep waiting*,
+> never as *not there*.
