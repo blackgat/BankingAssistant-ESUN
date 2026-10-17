@@ -274,7 +274,7 @@ is a far steadier signal than matching Chinese label text.
 | Capability | Verdict | Why |
 |---|---|---|
 | Login detection | **broken** | `a.log_out` no longer exists. Nothing else runs, because the runner stops here. |
-| iframe + `all_frames` + frame gating | **obsolete** | No iframes at all. `thisFrameIsBankApp()` and the `all_frames` rationale can be dropped. |
+| iframe + `all_frames` + frame gating | **removed 2026-10-17** | No iframes at all. `all_frames` is gone from the manifest; the guard it was paired with lives on as `pageIsBankApp()`, which checks the two things that always mattered — allowed origin, signed-in session. |
 | Wizard page-state | **broken as written** | `.step .current` matches 0 nodes. The words 資料編輯 / 資料確認 still exist, in elements of class `content`, and 資料編輯 is the one marked active. Prefer the route. |
 | Navigate to transfer | **broken** | Was a side-menu link; now a `<button>` reading 臺幣轉帳 (note 臺, not 台) plus SPA routing, so the post-click wait changes too. |
 | Select source account | **broken** | Was a `<select>`. Now a **`readOnly` `input.combo-input`** inside `.combo-input-wrapper` — it has to be clicked to open a picker; setting `.value` will do nothing. |
@@ -456,3 +456,58 @@ preferences and would survive a logout, so they answer the wrong question.
 > Whether the extension should press 繼續使用 to hold the session open is a design
 > question, not an obvious yes: it keeps a bank session alive on the user's
 > behalf. Left undecided here.
+
+### Two things the picker does that reading the DOM does not reveal
+
+Both were found by running the rewritten adapter against the live form on
+2026-10-17 and watching it fail. Neither is visible in a static probe.
+
+**The payee list is behind a tab the dialog does not open on.** Choosing the
+常用/約定帳號 radio is not enough. The dialog still opens on its **常用帳號** tab,
+which held one row, while the designated accounts the batch transfers to are on
+**約定帳號**, which held ten. The tabs are `div[role="tab"]` inside
+`.out-account-tab-header`, and the active one carries `selected`. A dialog
+reporting "no matching account" while the account plainly exists is this.
+
+```
+div.out-account-tab-button.selected  role=tab   常用帳號    ← opens here, 1 row
+div.out-account-tab-button           role=tab   約定帳號    ← 10 rows
+```
+
+There is also a keyword search (`input.curr-combo-input`) in the dialog, unused
+by the adapter but a possible fallback if the tab markup moves again.
+
+**The first click after changing the payee radio is swallowed.** Measured:
+
+```
+click 最近轉帳 → click 常用/約定帳號 → click the payee trigger immediately
+  the trigger is the SAME DOM node afterwards
+  the dialog never opens — waiting 6s does not help
+  clicking again 600ms later opens it in 120ms
+```
+
+So the component is re-initialising and discards the click without any signal.
+The adapter opens with up to three attempts, re-querying the trigger each time,
+rather than treating one dead click as "there is no picker". Both behaviours are
+pinned by regression tests, because both look like redundant code to anyone
+tidying up later.
+
+### What the live test did and did not prove (2026-10-17)
+
+Driven through `DRY_RUN_FILL`, which fills the form and cannot advance or submit:
+
+| Checked | Result |
+|---|---|
+| Login detection without `all_frames` | passes |
+| Route → page state | `/edit` reads as `transfer_form` |
+| Source picker | selects the configured account |
+| Payee picker, after the two fixes | selects the right one, confirmed by last-5 |
+| Amount | filled |
+| **Memos not swapped** | 給自己 and 給對方 each received their own distinct value |
+| **No dialog left covering the form on failure** | zero open dialogs after every failed pick |
+| Available balance | 0.95 |
+
+Still unproven: **the completion step**. It needs a real transfer, so
+`readCompletion` deliberately returns confidence below the runner's threshold —
+the next real batch will stop at the completion page and ask rather than record
+a transfer as done on an unverified reading. Raise it only after seeing that page.

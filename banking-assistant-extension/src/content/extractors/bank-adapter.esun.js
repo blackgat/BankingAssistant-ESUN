@@ -85,6 +85,11 @@ export const ESUN_SELECTORS = Object.freeze({
     row: "li[role='button']",
     selectedRow: "li.selected",
     closeButton: ".modal-header button[aria-label='關閉']",
+    // The payee dialog opens on 常用帳號, which holds a different and much
+    // shorter list than the designated accounts a batch transfers to.
+    tab: "[role='tab']",
+    tabSelected: "selected",
+    payeeTabText: /約定帳號/,
   },
 
   // Placeholders identify the fields more reliably than the surrounding labels,
@@ -257,6 +262,26 @@ export class EsunAdapter extends BaseBankAdapter {
     }
   }
 
+  /**
+   * Rows, once the list has stopped changing.
+   *
+   * Switching tabs re-renders the list, and the outgoing tab's rows are still
+   * present for a moment. Matching against those would pick from the wrong
+   * list, so wait for two consecutive reads to agree before believing them.
+   */
+  async _settledRows() {
+    let last = -1;
+    for (let i = 0; i < 40; i++) {
+      const open = this._openModal();
+      const rows = open ? Array.from(open.querySelectorAll(this.selectors.combo.row)) : [];
+      if (rows.length > 0 && rows.length === last) return rows;
+      last = rows.length;
+      await new Promise((r) => setTimeout(r, 120));
+    }
+    const open = this._openModal();
+    return open ? Array.from(open.querySelectorAll(this.selectors.combo.row)) : [];
+  }
+
   /** Click, refusing the buttons that must never be pressed by this extension. */
   _click(el) {
     if (!el) return false;
@@ -399,21 +424,57 @@ export class EsunAdapter extends BaseBankAdapter {
    * Open the picker, click the row matching `matches`, confirm it took.
    * Leaves the dialog closed on every path, including failure.
    */
-  async _pickFromCombo(placeholderRe, matches) {
-    const trigger = this._comboTrigger(placeholderRe);
-    if (!trigger) return false;
+  async _pickFromCombo(placeholderRe, matches, { tabText } = {}) {
+    const first = this._comboTrigger(placeholderRe);
+    if (!first) return false;
+    const before = first.value || "";
 
-    const before = trigger.value || "";
-    this._click(trigger);
-
-    const modal = await this._poll(() => this._openModal(), { timeoutMs: 6000 });
+    // Open with retries rather than one click.
+    //
+    // Measured on the live site: selecting the designated-payee radio leaves
+    // the component re-initialising, and a click landing in that window is
+    // swallowed — the element is the same node, it simply does nothing, and
+    // waiting six seconds does not help. A second click 600ms later opens the
+    // dialog immediately. So re-query the trigger and try again rather than
+    // treating one dead click as "there is no picker".
+    let modal = null;
+    for (let attempt = 0; attempt < 3 && !modal; attempt++) {
+      const trigger = this._comboTrigger(placeholderRe);
+      if (!trigger) break;
+      this._click(trigger);
+      modal = await this._poll(() => this._openModal(), { timeoutMs: 2500 });
+    }
     if (!modal) return false;
 
-    const rows = await this._poll(() => {
-      const r = Array.from(modal.querySelectorAll(this.selectors.combo.row));
-      return r.length ? r : null;
-    }, { timeoutMs: 4000 });
-    if (!rows) {
+    if (tabText) {
+      const tab = await this._poll(
+        () => {
+          const open = this._openModal();
+          return open
+            ? Array.from(open.querySelectorAll(this.selectors.combo.tab))
+                .find((t) => tabText.test(this._textOf(t))) || null
+            : null;
+        },
+        { timeoutMs: 4000 },
+      );
+      if (!tab) {
+        await this._closePicker();
+        return false;
+      }
+      if (!String(tab.className).includes(this.selectors.combo.tabSelected)) {
+        this._click(tab);
+        await this._poll(() => {
+          const open = this._openModal();
+          if (!open) return null;
+          const now = Array.from(open.querySelectorAll(this.selectors.combo.tab))
+            .find((t) => tabText.test(this._textOf(t)));
+          return now && String(now.className).includes(this.selectors.combo.tabSelected) ? true : null;
+        }, { timeoutMs: 3000 });
+      }
+    }
+
+    const rows = await this._settledRows();
+    if (!rows.length) {
       await this._closePicker();
       return false;
     }
@@ -430,14 +491,24 @@ export class EsunAdapter extends BaseBankAdapter {
     // Both conditions, because either can be true while the other has not
     // happened yet.
     const settled = await this._poll(
-      () => (!this._openModal() && (trigger.value || "") !== before ? true : null),
+      () => {
+        const t = this._comboTrigger(placeholderRe);
+        return !this._openModal() && t && (t.value || "") !== before ? true : null;
+      },
       { timeoutMs: 5000 },
     );
     if (!settled) await this._closePicker();
     return !!settled;
   }
 
-  /** Match a picker row against a configured account: last-5 and/or nickname. */
+  /**
+   * Match a picker row against a configured account.
+   *
+   * Source rows read "<account digits> <nickname>", so either key works. Rows
+   * on the designated-payee tab read "<bank name> <account digits>" with no
+   * nickname at all, which leaves the last-5 as the only thing that can match
+   * there — a payee configured without one will not be found.
+   */
   _rowMatcher(acct) {
     const last5 = String(acct?.accountLast5 || "").replace(/\D/g, "");
     const pattern = acct?.displayNamePattern ? new RegExp(acct.displayNamePattern) : null;
@@ -486,7 +557,10 @@ export class EsunAdapter extends BaseBankAdapter {
     // Choose the designated-payee group first: it decides which rows the picker
     // will offer at all.
     this._selectRadio(this.selectors.modes.payeeSource.designated);
-    return this._pickFromCombo(this.selectors.placeholders.payee, this._rowMatcher(payee));
+    // The radio is not enough: the dialog still opens on 常用帳號.
+    return this._pickFromCombo(this.selectors.placeholders.payee, this._rowMatcher(payee), {
+      tabText: this.selectors.combo.payeeTabText,
+    });
   }
 
   async fillAmount(amount) {

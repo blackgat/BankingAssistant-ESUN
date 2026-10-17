@@ -218,3 +218,79 @@ test("new site: completion stays below the runner's threshold until verified", (
   assert.ok(r.confidence < 0.9, "an unverified completion page must not read as proof");
   assert.ok(r.missingFields.join().includes("unverified"));
 });
+
+test("new site: the payee list is behind a tab the dialog does not open on", async () => {
+  // The dialog opens on 常用帳號, which holds a different and much shorter list
+  // than the designated accounts a batch transfers to. Measured on the live
+  // site: one row on the default tab, ten on 約定帳號.
+  const doc = loadDom(
+    `<!DOCTYPE html><html><body>
+       <input class="combo-input" readonly placeholder="請選擇轉入帳號">
+       <label><input type="radio">常用/約定帳號</label>
+       <div id="host"></div>
+     </body></html>`,
+    EDIT_URL,
+  );
+  const trigger = doc.querySelector("input.combo-input");
+  const host = doc.getElementById("host");
+  const render = (tab) => {
+    host.innerHTML = `
+      <div class="combo-modal" role="dialog">
+        <div class="modal-header"><button class="toggle" aria-label="關閉"></button></div>
+        <div><div role="tab" class="${tab === "common" ? "selected" : ""}">常用帳號</div>
+             <div role="tab" class="${tab === "designated" ? "selected" : ""}">約定帳號</div></div>
+        <ul>${(tab === "designated"
+                ? ["玉山銀行 0000000012345", "兆豐銀行 0000000099999"]
+                : ["台新銀行 0000000077777"]
+              ).map((r) => `<li role="button">${r}</li>`).join("")}</ul>
+      </div>`;
+    for (const t of doc.querySelectorAll("[role=tab]")) {
+      t.addEventListener("click", () => render(t.textContent.includes("約定") ? "designated" : "common"));
+    }
+    for (const li of doc.querySelectorAll(".combo-modal li")) {
+      li.addEventListener("click", () => { trigger.value = li.textContent; host.innerHTML = ""; });
+    }
+    const close = doc.querySelector(".combo-modal button[aria-label='關閉']");
+    if (close) close.addEventListener("click", () => { host.innerHTML = ""; });
+  };
+  trigger.addEventListener("click", () => render("common"));
+
+  const a = new EsunAdapter({ root: doc, config });
+  // The payee exists only on the designated tab.
+  const ok = await a.selectDestinationPayee({ id: "p1", accountLast5: "12345" });
+  assert.equal(ok, true, "must switch tabs to find a designated payee");
+  assert.match(trigger.value, /12345/);
+});
+
+test("new site: a swallowed first click on the picker is retried", async () => {
+  // Measured on the live site: choosing the designated radio leaves the
+  // component re-initialising and the next click does nothing at all — same
+  // node, no dialog, and waiting does not help. Only a second click opens it.
+  const doc = loadDom(
+    `<!DOCTYPE html><html><body>
+       <input class="combo-input" readonly placeholder="請選擇轉出帳號">
+       <div id="host"></div>
+     </body></html>`,
+    EDIT_URL,
+  );
+  const trigger = doc.querySelector("input.combo-input");
+  const host = doc.getElementById("host");
+  let clicks = 0;
+  trigger.addEventListener("click", () => {
+    if (++clicks < 2) return; // the first one is eaten, exactly as observed
+    host.innerHTML = `
+      <div class="combo-modal" role="dialog">
+        <div class="modal-header"><button class="toggle" aria-label="關閉"></button></div>
+        <ul><li role="button">000000012345 零用金</li></ul>
+      </div>`;
+    doc.querySelector(".combo-modal li").addEventListener("click", () => {
+      trigger.value = "000000012345 零用金";
+      host.innerHTML = "";
+    });
+  });
+
+  const a = new EsunAdapter({ root: doc, config });
+  const ok = await a.selectSourceAccount({ id: "s1", accountLast5: "12345" });
+  assert.equal(ok, true, "one dead click must not read as 'there is no picker'");
+  assert.ok(clicks >= 2, `expected a retry, saw ${clicks} click(s)`);
+});
