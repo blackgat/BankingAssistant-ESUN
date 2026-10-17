@@ -615,3 +615,124 @@ button's text and class, and whether the underlying form is still reachable.
 Then decide the policy — almost certainly *stop and ask*, since "I have already
 sent this exact transfer" is precisely the thing a person should look at rather
 than an automation dismiss.
+
+### KNOWN ISSUE — the balance is read, but what makes it appear is not pinned down (2026-10-17)
+
+One batch in three failed with `balance_not_displayed`; the other two read the
+balance correctly. What separates them is not established.
+
+What is measured:
+
+- **The form's own payload does not carry the balance.** `POST
+  /esb/mib-ctw-portal/ctw03/ctw03003/edit/initData` returns six transfer-out
+  accounts with `accountBalance: ""` on every one of them.
+- **可用餘額 is absent on a freshly loaded form**, before any account is picked.
+  The only 餘額 on the page then is boilerplate in the fraud-warning notice. It
+  is absent on the `/esb/` home page as well.
+- **When it is read, it is right.** Two batches recorded `balance observed for
+  零用金 amount=166587`. That equals 零用金's `realAmount` in `POST
+  /esb/mib-ctw-portal/ctwB1/ctwB1001/home/queryTWDepositAccountDetail`, and no
+  other account's. Figure and attribution were both correct — an earlier
+  suspicion that it came from another account's leftover card was wrong, and
+  came from comparing the figure only against the form's payload.
+- **The failing run timed out rather than misread.** 8.6s from batch start to
+  `balance_not_displayed`: the picker, plus the 8s `readNumber` poll expiring.
+
+The open question is therefore not whether the balance can be read, but **what
+makes it appear**. The hypothesis consistent with all of the above is that the
+form fetches and renders 可用餘額 for the source account only once that account
+is selected — which would account for its absence before a pick, its absence
+from `initData`, and its correct attribution when present. Unverified: nobody
+has watched the DOM across a selection yet.
+
+Until that is measured, leave `requireBalanceCheck` on. The gate did its job: on
+the run where it could not establish a figure, it stopped. What may need
+changing is the 8s poll, or reading a specific element rather than scanning the
+whole document for the label.
+
+Where the balance definitively lives, should the form turn out not to carry it:
+`queryTWDepositAccountDetail` returns `demandDeposits.accountList[]` with
+`accountAlias` and `realAmount` per account, all six present. Attribution there
+is per row and needs no whole-document scan.
+
+### Before the next batch — what to capture (2026-10-17)
+
+One open question is blocking nothing right now but has no explanation: on
+2026-10-17 at 06:30 a batch stopped with `balance_not_displayed` after an 8.6s
+wait, while the two batches either side of it read 零用金's balance correctly.
+可用餘額 is absent from a freshly loaded form and from `edit/initData`, so
+something makes it appear, and nobody has watched it happen.
+
+**Capture it on the next run, before starting the batch.** The measurement costs
+one extra step and answers whether the 8s poll is too short or the reader is
+looking in the wrong place.
+
+What to find out:
+
+1. When 可用餘額 first appears, relative to picking the source account.
+2. Which element holds it, and whether the figure is a sibling or inside the
+   same node as the label.
+3. Whether a separate request fetches it — list the page's XHRs after the pick
+   and look for anything after `ctw03/ctw03003/edit/initData`.
+
+Steps:
+
+1. Navigate to the transfer form **in the app** (do not hard-reload afterwards;
+   if you do, just run the snippet again).
+2. Paste the snippet below into that tab's console.
+3. Open 轉出帳號 and pick the source account.
+4. Submit nothing. Read the log with `JSON.parse(sessionStorage.baProbe)`.
+
+The log is kept in `sessionStorage`, so it survives a reload of the tab; the
+observer does not, and has to be re-installed after one.
+
+```js
+// Records every change to 可用餘額 or to the chosen source account. Digits masked.
+(() => {
+  const KEY = "baProbe";
+  const mask = s => String(s || "").replace(/\d/g, "#");
+  const read = () => { try { return JSON.parse(sessionStorage[KEY]) || []; } catch { return []; } };
+  const save = l => { try { sessionStorage[KEY] = JSON.stringify(l); } catch {} };
+  const nodes = () => {
+    const out = [], w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    for (let n; (n = w.nextNode()); ) {
+      const t = (n.nodeValue || "").trim();
+      if (!t.includes("可用餘額")) continue;
+      const el = n.parentElement;
+      out.push({
+        tag: el.tagName.toLowerCase(),
+        cls: String(el.className).slice(0, 70),
+        own: mask(t).slice(0, 70),
+        parentCls: String(el.parentElement?.className || "").slice(0, 70),
+        parentText: mask(el.parentElement?.innerText).slice(0, 160),
+        nextSib: mask(el.nextElementSibling?.innerText).slice(0, 60),
+      });
+    }
+    return out;
+  };
+  const src = () => {
+    const i = [...document.querySelectorAll("input")].find(e => /轉出帳號/.test(e.placeholder || ""));
+    return i ? mask(i.value) : "(no field)";
+  };
+  const t0 = performance.now();
+  const snap = why => {
+    const l = read();
+    l.push({ ms: Math.round(performance.now() - t0), why, path: location.pathname, source: src(), balance: nodes() });
+    save(l);
+  };
+  if (window.__baObs) window.__baObs.disconnect();
+  let timer = null;
+  window.__baObs = new MutationObserver(() => {
+    clearTimeout(timer);
+    timer = setTimeout(() => {
+      const l = read(), prev = l[l.length - 1];
+      const n = nodes(), s = src();
+      if (!prev || prev.source !== s || prev.balance.length !== n.length) snap("change");
+    }, 150);
+  });
+  window.__baObs.observe(document.body, { childList: true, subtree: true, characterData: true });
+  sessionStorage.removeItem(KEY);
+  snap("installed");
+  return "probe armed — pick the source account now";
+})();
+```

@@ -176,7 +176,7 @@ test("new site: selecting a source drives the picker dialog and reveals 可用�
 
   const r = await a.readBalance(acct);
   assert.ok(r.confidence >= 0.9, `confidence ${r.confidence}`);
-  assert.equal(r.value.available, 50000);
+  assert.equal(r.value.balance, 50000);
 });
 
 test("new site: no matching row closes the picker instead of leaving it open", async () => {
@@ -271,7 +271,7 @@ test("new site: balance is read after its label, not as the first number", async
     "<div>零用金 0531234567647 可用餘額 TWD 50,000</div>";
 
   const r = await a.readBalance(acct);
-  assert.equal(r.value.available, 50000, "must not return the account number");
+  assert.equal(r.value.balance, 50000, "must not return the account number");
 });
 
 test("new site: a balance that cannot be attributed to the account is refused", async () => {

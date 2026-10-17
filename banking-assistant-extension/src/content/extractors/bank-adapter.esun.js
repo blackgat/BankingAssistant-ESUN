@@ -744,8 +744,17 @@ export class EsunAdapter extends BaseBankAdapter {
     // between the wait and the read.
     if (!selected()) return fail("source_changed_while_reading");
 
+    // Shape fixed by the base adapter and consumed by the runner as
+    // reading.value.balance keyed on sourceAccountId. Do not rename these.
     return {
-      value: { accountId: sourceAccount.id, available: value, currency: CURRENCY },
+      value: {
+        sourceAccountId: sourceAccount.id,
+        displayName: sourceAccount.label,
+        accountLast5: sourceAccount.accountLast5,
+        balance: value,
+        currency: CURRENCY,
+        observedAt: new Date().toISOString(),
+      },
       confidence: 0.95,
       missingFields: [],
     };
