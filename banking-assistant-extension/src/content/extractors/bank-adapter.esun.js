@@ -123,6 +123,14 @@ export const ESUN_SELECTORS = Object.freeze({
 
   balance: { label: /可用餘額/ },
 
+  // Observed on a real transfer, 2026-10-17.
+  completionStep: {
+    successText: /(交易成功|交易完成|轉帳成功)/,
+    // The labelled rows the page actually carries. No serial among them.
+    fields: [/轉帳金額/, /轉入對象/, /轉出帳號/, /轉帳日期/],
+    nextTransferText: /再轉一筆/,
+  },
+
   confirmStep: {
     labelCell: ".info-header",
     // An empty memo renders as "-" on the confirm step, not as an empty string.
@@ -654,10 +662,15 @@ export class EsunAdapter extends BaseBankAdapter {
   async readBalance(sourceAccount) {
     if (!this._isEsunApp()) return super.readBalance(sourceAccount);
     const read = () => {
-      const label = this._leafByText(this.selectors.balance.label, 24);
+      // On the result step the account number and the balance share one text
+      // node — "零用金 <13 digits> 可用餘額 TWD 12,345" — so the first number in
+      // the cell is the account, not the balance. Read only what follows the
+      // label.
+      const label = this._leafByText(this.selectors.balance.label, 40);
       if (!label) return null;
-      const scope = label.parentElement || label;
-      const m = this._textOf(scope).match(/[\d,]+(?:\.\d+)?/);
+      const whole = this._textOf(label.parentElement || label);
+      const after = whole.slice(whole.search(this.selectors.balance.label));
+      const m = after.match(/[\d,]+(?:\.\d+)?/);
       if (!m) return null;
       const n = Number(m[0].replace(/,/g, ""));
       return Number.isFinite(n) ? n : null;
@@ -683,37 +696,60 @@ export class EsunAdapter extends BaseBankAdapter {
   }
 
   /**
-   * NOT YET VERIFIED against the live bank — the completion step has never been
-   * observed, because reaching it means making a real transfer.
+   * Verified against a real transfer on 2026-10-17.
    *
-   * It fails closed on purpose. A wrong "completed" reading is the one mistake
-   * this extension must not make: the runner treats it as proof a transfer went
-   * through, and would move on to the next job. Returning low confidence stops
-   * the batch and asks the user, which is the correct behaviour for something
-   * unverified.
+   * The redesigned result page carries no transaction serial. The old site did
+   * — the audit log still holds one from August — but the labelled rows here
+   * are only 轉帳金額, 轉入對象, 轉出帳號, 轉帳日期 and the two memos. The long
+   * digit runs on the page are the two account numbers and some header chrome,
+   * so scanning the body and calling the first hit a reference would file an
+   * account number as proof of a transfer. It is left undefined instead. A
+   * serial is reachable behind the 交易明細 button, which navigates out of the
+   * flow and is not worth taking mid-batch.
+   *
+   * Proof of completion is therefore the result route, the success wording, and
+   * the result rows actually being there — any one alone is too weak.
    */
   readCompletion() {
     if (!this._isEsunApp()) return super.readCompletion();
-    const onRoute = this.selectors.routes.completion.test(this._path());
-    const generic = super.readCompletion();
-    if (!onRoute) return generic;
+    if (!this.selectors.routes.completion.test(this._path())) return super.readCompletion();
 
-    const body = this._textOf(this._doc.body);
-    const done = /(交易完成|交易成功|轉帳成功)/.test(body);
-    const ref = (body.match(/\b\d{6,}\b/) || [])[0];
-    if (!done) return generic;
+    const c = this.selectors.completionStep;
+    if (!c.successText.test(this._textOf(this._doc.body))) {
+      return { value: null, confidence: 0, missingFields: ["completion_text"] };
+    }
+
+    const cells = this._all(this.selectors.confirmStep.labelCell);
+    const present = c.fields.filter((re) => cells.some((e) => re.test(this._textOf(e)))).length;
+    if (present < 2) {
+      // Success wording with no result rows is not a completed transfer.
+      return { value: null, confidence: 0.4, missingFields: ["completion_fields"] };
+    }
 
     return {
       value: {
         completed: true,
-        bankReferenceMasked: ref ? maskReference(ref) : undefined,
+        bankReferenceMasked: undefined, // the page does not carry one
         pageState: PAGE_STATES.COMPLETION,
       },
-      // Capped below the runner's threshold until a real transfer confirms the
-      // page's shape. Raise it only with evidence in the field notes.
-      confidence: 0.5,
-      missingFields: ["completion_unverified_after_2026_10_17_redesign"],
+      confidence: 0.95,
+      missingFields: [],
     };
+  }
+
+  /** 再轉一筆 returns to the form for the next job in a batch. */
+  async navigateToNextTransfer() {
+    assertActionAllowed("navigateToNextTransfer");
+    if (!this._isEsunApp()) return super.navigateToNextTransfer();
+    const btn = this._all("button,a[role='button']").find(
+      (e) => this._visible(e) && this.selectors.completionStep.nextTransferText.test(this._textOf(e)),
+    );
+    if (!btn) return super.navigateToNextTransfer();
+    this._click(btn);
+    return !!(await this._poll(
+      () => (this.selectors.routes.transferForm.test(this._path()) ? true : null),
+      { timeoutMs: 15000 },
+    ));
   }
 
   async logout() {

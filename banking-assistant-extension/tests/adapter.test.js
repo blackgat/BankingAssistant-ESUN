@@ -209,14 +209,67 @@ test("new site: 下一步 is matched by text, and 立即交易 is refused", asyn
   assert.throws(() => a._click(doc.querySelector("button")), /forbidden/);
 });
 
-test("new site: completion stays below the runner's threshold until verified", () => {
+test("new site: a real result page reads as completed, with no invented reference", () => {
+  // Measured on a real transfer: the result page carries 轉帳金額, 轉入對象,
+  // 轉出帳號, 轉帳日期 and the memos — and no transaction serial at all. The
+  // long digit runs on it are the two account numbers.
   const doc = loadDom(
-    `<!DOCTYPE html><html><body><input class="combo-input">交易完成 123456789</body></html>`,
+    `<!DOCTYPE html><html><body><input class="combo-input">
+       <div>交易成功</div>
+       <div class="info-header">轉帳金額</div><div>1</div>
+       <div class="info-header">轉入對象</div><div>張○欽 玉山銀行 0531234567648</div>
+       <div class="info-header">轉出帳號</div><div>零用金 0531234567647 可用餘額 TWD 50,000</div>
+       <div class="info-header">轉帳日期</div><div>2026/10/17</div>
+       <button class="btn-footer-border">再轉一筆</button>
+     </body></html>`,
     "https://ebank.esunbank.com.tw/esb/deposit/twd-transfer/result",
   );
   const r = new EsunAdapter({ root: doc, config }).readCompletion();
-  assert.ok(r.confidence < 0.9, "an unverified completion page must not read as proof");
-  assert.ok(r.missingFields.join().includes("unverified"));
+  assert.equal(r.value.completed, true);
+  assert.ok(r.confidence >= 0.9, `confidence ${r.confidence}`);
+  assert.equal(
+    r.value.bankReferenceMasked,
+    undefined,
+    "the page has no serial; an account number must never be filed as one",
+  );
+});
+
+test("new site: success wording without the result rows is not a completed transfer", () => {
+  const doc = loadDom(
+    `<!DOCTYPE html><html><body><input class="combo-input">交易成功</body></html>`,
+    "https://ebank.esunbank.com.tw/esb/deposit/twd-transfer/result",
+  );
+  const r = new EsunAdapter({ root: doc, config }).readCompletion();
+  assert.ok(r.confidence < 0.9, "wording alone must not read as proof");
+  assert.equal(r.value, null);
+});
+
+test("new site: 再轉一筆 returns to the form for the next job", async () => {
+  const doc = loadDom(
+    `<!DOCTYPE html><html><body><input class="combo-input">
+       <div>交易成功</div>
+       <button class="btn-footer-border">再轉一筆</button>
+     </body></html>`,
+    "https://ebank.esunbank.com.tw/esb/deposit/twd-transfer/result",
+  );
+  let clicked = false;
+  doc.querySelector("button").addEventListener("click", () => { clicked = true; });
+  await new EsunAdapter({ root: doc, config }).navigateToNextTransfer();
+  assert.equal(clicked, true);
+});
+
+// The balance sits in the same text node as the account number on the result
+// page, so the first number in the cell is the wrong one.
+test("new site: balance is read after its label, not as the first number", async () => {
+  const doc = loadDom(
+    `<!DOCTYPE html><html><body><input class="combo-input">
+       <div class="info-header">轉出帳號</div>
+       <div>零用金 0531234567647 可用餘額 TWD 50,000</div>
+     </body></html>`,
+    EDIT_URL,
+  );
+  const r = await new EsunAdapter({ root: doc, config }).readBalance({ id: "s1", accountLast5: "67647" });
+  assert.equal(r.value.available, 50000, "must not return the account number");
 });
 
 test("new site: the payee list is behind a tab the dialog does not open on", async () => {

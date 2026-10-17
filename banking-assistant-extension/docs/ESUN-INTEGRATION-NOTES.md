@@ -507,7 +507,49 @@ Driven through `DRY_RUN_FILL`, which fills the form and cannot advance or submit
 | **No dialog left covering the form on failure** | zero open dialogs after every failed pick |
 | Available balance | 0.95 |
 
-Still unproven: **the completion step**. It needs a real transfer, so
-`readCompletion` deliberately returns confidence below the runner's threshold —
-the next real batch will stop at the completion page and ask rather than record
-a transfer as done on an unverified reading. Raise it only after seeing that page.
+The completion step was unproven when that table was written. It no longer is —
+see the section below, recorded from a real transfer later the same day.
+
+### The 交易結果 step (from a real transfer, 2026-10-17)
+
+Route `/esb/deposit/twd-transfer/result`, so the three steps are `edit` →
+`confirm` → `result`. The wizard words on screen are still only 資料編輯 and
+資料確認; 交易結果 is not among them, which is another reason to read the route.
+
+Success wording is **交易成功** (not 交易完成, which the old site used).
+
+Labelled rows, all `div.info-header` with the value in the next sibling:
+
+| Row | Note |
+|---|---|
+| 轉帳金額 | |
+| 轉入對象 | payee name already masked by the bank (張○欽), then bank and account |
+| 轉出帳號 | nickname, account, **and 可用餘額 in the same text node** |
+| 轉帳日期 | |
+| 備註給自己 / 給對方 | an empty memo renders as `-` |
+
+Footer buttons: **交易明細** and **再轉一筆**, both `btn-footer-border`.
+再轉一筆 is what returns a batch to the form for its next job.
+
+> #### There is no transaction serial on this page
+>
+> The old site showed one — the audit log still holds `202****388` from August —
+> and the rewrite originally planned to scan the body for a long digit run. On
+> the real page the only long runs are **the two account numbers** and some
+> digits in the header chrome, so that scan would have filed an account number
+> as proof of a transfer.
+>
+> `bankReferenceMasked` is therefore left undefined. A serial is presumably
+> behind 交易明細, but that navigates out of the flow and is not worth taking
+> mid-batch.
+>
+> Completion is proven instead by three things together: the result route, the
+> success wording, and the result rows being present. Wording alone returns low
+> confidence, because a page that says 交易成功 with no rows is not evidence.
+
+> #### The balance shares a text node with the account number
+>
+> `轉出帳號` reads `零用金 <13 digits> 可用餘額 TWD 50,000` as one string. Taking
+> the first number in that cell returns the account, not the balance — which
+> would then feed the balance checks for the rest of the batch. The reader now
+> takes the first number *after* the 可用餘額 label. Pinned by a test.
