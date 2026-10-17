@@ -16,6 +16,15 @@ notes to find what changed, then update
 
 ---
 
+> ## E.SUN redesigned on or before 2026-10-17 — sections 1 to 9 are now history
+>
+> The bank moved from a JSF widget inside an iframe to a Vue single-page app at a
+> new path. **Sections 1 to 9 below describe the pre-redesign site.** They are kept
+> deliberately: this file exists so the old and new DOM can be compared, and that
+> comparison is the fastest route to a working adapter.
+>
+> **For what is true now, and which capabilities broke, read [section 11](#11-the-2026-10-17-redesign).**
+
 ## 1. Page architecture
 
 - The top page `https://ebank.esunbank.com.tw/index.jsp` is a thin shell.
@@ -236,3 +245,81 @@ E.SUN redesign makes one of them resurface.
   The legacy key is read but never deleted, so the old draft remains recoverable.
   See figure 8 of `docs/architecture.html` for the data model and diagram.
 
+
+---
+
+## 11. The 2026-10-17 redesign
+
+**Observed:** 2026-10-17, live logged-in session, read-only digit-redacted probes
+driven through the `chrome-devtools` MCP. No transfer was made and no value was
+entered; everything below came from reading the DOM of the account home page and
+an empty transfer form.
+
+### What changed at the architecture level
+
+| | Before (sections 1-9) | Now |
+|---|---|---|
+| Entry URL | `https://ebank.esunbank.com.tw/index.jsp` | `https://ebank.esunbank.com.tw/esb/` |
+| App location | same-origin `#iframe1` → `FCO08001_Home.faces` | **top document, zero iframes** |
+| Stack | JSF widgets, class-less markup, dynamic ids | **Vue SPA**, stable-looking class names |
+| Page identity | one URL for the whole wizard | **real routes**, e.g. `/esb/deposit/twd-transfer/edit` |
+| Login marker | `a.log_out` | gone; 登出 is an `<a class="modal-second-button">` |
+
+The route is the important gain. The old adapter had to read the wizard's step
+text because every step shared a URL; the new app puts the step in the path, which
+is a far steadier signal than matching Chinese label text.
+
+### Capability verdict
+
+| Capability | Verdict | Why |
+|---|---|---|
+| Login detection | **broken** | `a.log_out` no longer exists. Nothing else runs, because the runner stops here. |
+| iframe + `all_frames` + frame gating | **obsolete** | No iframes at all. `thisFrameIsBankApp()` and the `all_frames` rationale can be dropped. |
+| Wizard page-state | **broken as written** | `.step .current` matches 0 nodes. The words 資料編輯 / 資料確認 still exist, in elements of class `content`, and 資料編輯 is the one marked active. Prefer the route. |
+| Navigate to transfer | **broken** | Was a side-menu link; now a `<button>` reading 臺幣轉帳 (note 臺, not 台) plus SPA routing, so the post-click wait changes too. |
+| Select source account | **broken** | Was a `<select>`. Now a **`readOnly` `input.combo-input`** inside `.combo-input-wrapper` — it has to be clicked to open a picker; setting `.value` will do nothing. |
+| Select destination payee | **broken** | Same combo-input pattern. |
+| 約定 / 即時 radios | **broken semantics** | There are now **two independent radio groups**, not one choice: payee source (最近轉帳 ✓ / 常用、約定帳號 / 自行輸入) and timing (即時轉帳 ✓ / 預約單日 / 預約週期). The old `modes: {designated:/約定/, instant:/即時/}` happens to hit a plausible target in each group, but it is matching across two different axes by luck. |
+| Available balance | **at risk** | The 可用餘額 label still exists (class `mib-remark`), but the old read depends on first driving a `<select>`, which is gone. |
+| Amount field | **probably fine** | Still a plain editable `input[type=text]`, placeholder 請輸入轉帳金額. |
+| Memo fields (two) | **at risk** | Both are `input[type=text]` with placeholder 限NN個中英數字. Walking up from the input found **「備註給對方」 for both**, so the two are not distinguishable by that method and the adapter could fill the wrong one. The verification-page `memo_*_match` check would catch it and stop the batch, so this misfires safely — but it does misfire. |
+| Submit (下一步) | **probably fine** | `<button class="btn-main-fill">下一步</button>`, text unchanged. |
+| Verification-page extraction | **untested** | Needs the 資料確認 step, which needs a filled form. |
+| Completion-page extraction | **untested** | Needs a real transfer. |
+| Named lists, policy, state machine, sanitizer, backup | **unaffected** | All pure, no DOM. |
+
+### Scope of the repair
+
+Everything that broke lives in
+[`bank-adapter.esun.js`](../src/content/extractors/bank-adapter.esun.js) (495 lines)
+plus `tests/fixtures/*`. Of the 89 unit tests only the ~10 adapter tests depend on
+the bank's DOM; policy, lists, state machine, sanitizer and backup are untouched.
+This is the payoff for having confined every bank-specific assumption to one file.
+
+It is a rewrite of that adapter, not a patch — the selector strategy itself changed,
+from "find a label, walk to its control" against class-less JSF output, to a Vue app
+with routes and named classes.
+
+### Re-inspection probes for the new site
+
+Run from the page console (no iframe hop any more). Digits redacted.
+
+```js
+// Page identity and step, from the route
+JSON.stringify({ path: location.pathname, step: location.pathname.split("/").pop() });
+```
+
+```js
+// Labelled controls on the transfer form
+const red = s => (s||"").replace(/\d/g,"#").replace(/\s+/g," ").trim().slice(0,48);
+JSON.stringify([...document.querySelectorAll("input,select,textarea")]
+  .filter(e => e.type !== "hidden")
+  .map(e => ({ type: e.type, cls: red(e.className), ph: red(e.placeholder), ro: e.readOnly })));
+```
+
+```js
+// Both radio groups, with which option is selected
+const txt = e => (e?.textContent||"").replace(/\s+/g," ").trim();
+JSON.stringify([...document.querySelectorAll("input[type=radio]")].map(r => ({
+  label: txt(r.closest("label")) || txt(r.parentElement), checked: r.checked })));
+```
