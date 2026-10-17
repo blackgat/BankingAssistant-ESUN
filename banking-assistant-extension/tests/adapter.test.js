@@ -347,3 +347,31 @@ test("new site: a swallowed first click on the picker is retried", async () => {
   assert.equal(ok, true, "one dead click must not read as 'there is no picker'");
   assert.ok(clicks >= 2, `expected a retry, saw ${clicks} click(s)`);
 });
+
+test("new site: the confirm step is read from its real layout", () => {
+  // Copied from the live 資料確認 step. Two traps are deliberate here:
+  // 轉入對象別名 holds the nickname and contains the string 轉入對象, and the
+  // 轉帳金額 item holds only its label, with the amount as the item's sibling.
+  const doc = loadDom(
+    `<!DOCTYPE html><html><body><input class="combo-input">
+       <div>
+         <div class="txn-data-item"><div class="info-header">轉帳金額</div></div>
+         <div>TWD 1</div>
+         <div class="txn-data-item"><div class="info-header">轉入對象別名</div><div>動產臨時支出準備金</div></div>
+         <div class="txn-data-item"><div class="info-header">轉入對象</div><div>張○欽 玉山銀行 0531234567648</div></div>
+         <div class="txn-data-item"><div class="info-header">轉出帳號</div><div>0531234567647 零用金</div></div>
+         <div class="txn-data-item"><div class="info-header">備註給自己</div><div>-</div></div>
+         <div class="txn-data-item"><div class="info-header">備註給對方</div><div>記號</div></div>
+       </div>
+     </body></html>`,
+    "https://ebank.esunbank.com.tw/esb/deposit/twd-transfer/confirm",
+  );
+  const r = new EsunAdapter({ root: doc, config }).readVerificationSummary();
+
+  assert.equal(r.value.amount, 1, "the amount is a sibling of its item, not a child");
+  assert.equal(r.value.destinationAccountLast5, "67648", "must read 轉入對象, not 轉入對象別名");
+  assert.equal(r.value.sourceAccountLast5, "67647");
+  assert.equal(r.value.memoShort, undefined, "an empty memo renders as - and means empty");
+  assert.equal(r.value.memoLong, "記號");
+  assert.ok(r.confidence >= 0.99, `confidence ${r.confidence}`);
+});

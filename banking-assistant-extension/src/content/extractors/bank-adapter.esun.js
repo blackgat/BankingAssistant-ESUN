@@ -133,6 +133,19 @@ export const ESUN_SELECTORS = Object.freeze({
 
   confirmStep: {
     labelCell: ".info-header",
+    // Each field is a .txn-data-item holding the label and, usually, its value.
+    item: ".txn-data-item",
+    // Exact text, because 轉入對象別名 contains 轉入對象 and holds the nickname
+    // rather than the account — matching loosely picks the wrong row and loses
+    // the digits the policy compares.
+    labels: {
+      source: "轉出帳號",
+      payee: "轉入對象",
+      payeeAlias: "轉入對象別名",
+      amount: "轉帳金額",
+      memoSelf: "備註給自己",
+      memoOther: "備註給對方",
+    },
     // An empty memo renders as "-" on the confirm step, not as an empty string.
     emptyValue: "-",
   },
@@ -616,19 +629,30 @@ export class EsunAdapter extends BaseBankAdapter {
 
   // --- reads ---------------------------------------------------------------
 
-  /** Value cell paired with a label cell on the confirm step. */
-  _confirmValue(labelRe) {
-    const label = this._all(this.selectors.confirmStep.labelCell).find((e) =>
-      labelRe.test(this._textOf(e)),
-    );
+  /**
+   * Value for a labelled row on the confirm or result step.
+   *
+   * Rows are .txn-data-item holding the label and its value — except 轉帳金額,
+   * whose item contains only the label, with the amount rendered as the item's
+   * next sibling. Both shapes are handled; taking only the first would leave
+   * the amount undefined, and the policy compares it on every job.
+   *
+   * The label is matched exactly: 轉入對象別名 contains 轉入對象 and carries the
+   * nickname instead of the account, so a loose match silently drops the digits.
+   */
+  _confirmValue(labelText) {
+    const c = this.selectors.confirmStep;
+    const label = this._all(c.labelCell).find((e) => this._textOf(e) === labelText);
     if (!label) return "";
-    let v = label.nextElementSibling;
-    if (!v) {
-      const row = label.parentElement;
-      v = row ? Array.from(row.children).find((c) => c !== label && !c.contains(label)) : null;
-    }
+
+    const item = label.closest(c.item) || label.parentElement;
+    let v = item
+      ? Array.from(item.children).find((x) => x !== label && !x.contains(label))
+      : label.nextElementSibling;
+    if (!v && item) v = item.nextElementSibling; // the 轉帳金額 shape
+
     const text = this._textOf(v);
-    return text === this.selectors.confirmStep.emptyValue ? "" : text;
+    return text === c.emptyValue ? "" : text;
   }
 
   readVerificationSummary() {
@@ -636,11 +660,12 @@ export class EsunAdapter extends BaseBankAdapter {
     if (!this.selectors.routes.verification.test(this._path())) {
       return super.readVerificationSummary();
     }
-    const srcVal = this._confirmValue(this.selectors.labels.source);
-    const payVal = this._confirmValue(this.selectors.labels.payee);
-    const amtVal = this._confirmValue(this.selectors.labels.amount);
-    const memoSelf = this._confirmValue(this.selectors.labels.memoSelf);
-    const memoOther = this._confirmValue(this.selectors.labels.memoOther);
+    const L = this.selectors.confirmStep.labels;
+    const srcVal = this._confirmValue(L.source);
+    const payVal = this._confirmValue(L.payee);
+    const amtVal = this._confirmValue(L.amount);
+    const memoSelf = this._confirmValue(L.memoSelf);
+    const memoOther = this._confirmValue(L.memoOther);
     if (!payVal && !amtVal && !srcVal) return super.readVerificationSummary();
 
     const payeeName = (payVal.split(/[（(]|約定|玉山銀行|銀行/)[0] || "").trim();

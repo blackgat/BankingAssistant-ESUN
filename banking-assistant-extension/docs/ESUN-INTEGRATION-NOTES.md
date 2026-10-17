@@ -553,3 +553,38 @@ Footer buttons: **交易明細** and **再轉一筆**, both `btn-footer-border`.
 > the first number in that cell returns the account, not the balance — which
 > would then feed the balance checks for the rest of the batch. The reader now
 > takes the first number *after* the 可用餘額 label. Pinned by a test.
+
+### The 資料確認 layout, and two traps in it (2026-10-17)
+
+Found by running the rewritten reader against the live confirm step before
+transferring anything. Both would have stopped every job in a batch.
+
+Rows are `div.txn-data-item` holding `div.info-header` (the label) and a sibling
+div (the value). The labels present are:
+
+```
+轉帳金額 · 轉入對象別名 · 轉入對象 · 轉出帳號 · 轉帳日期 · 備註給對方 · 備註給自己
+```
+
+> **There is no 轉入帳號 here.** The edit step uses that name; the confirm step
+> says **轉入對象**. A reader carrying the edit step's vocabulary finds nothing.
+
+**Trap 1 — 轉入對象別名 contains 轉入對象.** The alias row holds the nickname
+(動產臨時支出準備金) with no digits in it; the real row holds
+`張○欽 玉山銀行 <13 digits>`. A substring match hits the alias first and loses
+the account number the policy compares, so the label is matched **exactly**.
+
+**Trap 2 — 轉帳金額's item has no value in it.** Its `.txn-data-item` contains
+only the label, and the amount is rendered as the **item's next sibling**:
+
+```html
+<div class="txn-data-item"><div class="info-header">轉帳金額</div></div>
+<div>TWD 1</div>
+```
+
+Every other row keeps its value inside the item. Reading only the in-item shape
+leaves the amount undefined, and the amount is compared on every job.
+
+Measured after the fix, against the live page: source found, payee found with a
+last-5 matching the configured account, amount parsed as 1, empty memos read as
+empty rather than as `-`. Confidence 1.0.
