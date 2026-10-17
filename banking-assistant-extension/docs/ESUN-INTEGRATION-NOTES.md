@@ -588,3 +588,30 @@ leaves the amount undefined, and the amount is compared on every job.
 Measured after the fix, against the live page: source found, payee found with a
 last-5 matching the configured account, amount parsed as 1, empty memos read as
 empty rather than as `-`. Confidence 1.0.
+
+### TODO — the duplicate-transfer warning (reported 2026-10-17, unhandled)
+
+The bank now interrupts with a warning when the same amount goes to the same
+account twice in a row. Reported by the user after two consecutive 1 TWD
+transfers to one payee.
+
+**Not handled.** The adapter has never seen this dialog, so its markup, its
+buttons and whether it blocks the form are all unknown.
+
+Why it matters more than its size suggests:
+
+- It lands **between** 下一步 and the confirm step, or on confirm — exactly where
+  a batch is mid-job. An unrecognised dialog there looks like "the page did not
+  advance", which is the shape of a failure the adapter cannot explain.
+- It makes **repeated small test transfers the worst way to test a batch**. The
+  obvious rehearsal — two jobs of 1 TWD to the same payee — triggers it. Use two
+  different payees, or two different amounts.
+- It is the third dialog now known to appear over this flow, after the session
+  timeout (繼續使用 / 立即登出) and the picker. Whatever handles one should
+  probably handle all three: recognise, stop cleanly, say which dialog it was.
+
+When it next appears, capture: the container's classes, the exact wording, every
+button's text and class, and whether the underlying form is still reachable.
+Then decide the policy — almost certainly *stop and ask*, since "I have already
+sent this exact transfer" is precisely the thing a person should look at rather
+than an automation dismiss.

@@ -258,18 +258,39 @@ test("new site: 再轉一筆 returns to the form for the next job", async () => 
   assert.equal(clicked, true);
 });
 
-// The balance sits in the same text node as the account number on the result
-// page, so the first number in the cell is the wrong one.
+// The balance on screen belongs to whichever account the form has selected, and
+// nothing in the markup ties the two together.
 test("new site: balance is read after its label, not as the first number", async () => {
-  const doc = loadDom(
-    `<!DOCTYPE html><html><body><input class="combo-input">
-       <div class="info-header">轉出帳號</div>
-       <div>零用金 0531234567647 可用餘額 TWD 50,000</div>
-     </body></html>`,
-    EDIT_URL,
-  );
-  const r = await new EsunAdapter({ root: doc, config }).readBalance({ id: "s1", accountLast5: "67647" });
+  const doc = newSiteForm();
+  const a = new EsunAdapter({ root: doc, config });
+  const acct = { id: "s1", accountLast5: "12345", label: "零用金" };
+  await a.selectSourceAccount(acct);
+
+  // The fixture renders the balance beside the account, as the result step does.
+  doc.getElementById("bal").innerHTML =
+    "<div>零用金 0531234567647 可用餘額 TWD 50,000</div>";
+
+  const r = await a.readBalance(acct);
   assert.equal(r.value.available, 50000, "must not return the account number");
+});
+
+test("new site: a balance that cannot be attributed to the account is refused", async () => {
+  // Measured during a real batch: the reader answered 238ms after the batch
+  // began — before any source had been chosen — and reported a figure that was
+  // not this account's. A wrong balance is the input to the check that decides
+  // whether the batch may proceed, so an unattributable one must be no answer
+  // rather than a plausible one.
+  const doc = newSiteForm({ rows: ["000000099999 別的帳戶"] });
+  const a = new EsunAdapter({ root: doc, config });
+  doc.getElementById("bal").innerHTML = "<div><span>可用餘額</span><span>999,999</span></div>";
+
+  const r = await a.readBalance({ id: "s1", accountLast5: "12345", label: "零用金" });
+  assert.equal(r.value, null, "a figure on screen is not this account's balance");
+  assert.equal(r.confidence, 0);
+  assert.ok(
+    r.missingFields.join().includes("source"),
+    `should say the source could not be confirmed, got ${r.missingFields.join()}`,
+  );
 });
 
 test("new site: the payee list is behind a tab the dialog does not open on", async () => {

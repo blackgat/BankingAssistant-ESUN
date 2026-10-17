@@ -684,13 +684,27 @@ export class EsunAdapter extends BaseBankAdapter {
     return { value, confidence: have / 3, missingFields: have === 3 ? [] : ["verification_fields"] };
   }
 
+  /**
+   * Available balance for a specific account.
+   *
+   * The figure on screen belongs to whichever account the form currently has
+   * selected, and nothing in the markup ties the two together. An earlier
+   * version returned the first number it saw: during a real batch it answered
+   * 238ms after the batch began — before the source had been chosen — and
+   * reported a balance that was not this account's. A wrong balance is not a
+   * cosmetic error, it is the input to the check that decides whether the
+   * batch may proceed.
+   *
+   * So the account is confirmed selected before the number is believed, and
+   * confirmed still selected after reading it.
+   */
   async readBalance(sourceAccount) {
     if (!this._isEsunApp()) return super.readBalance(sourceAccount);
-    const read = () => {
+
+    const readNumber = () => {
       // On the result step the account number and the balance share one text
       // node — "零用金 <13 digits> 可用餘額 TWD 12,345" — so the first number in
-      // the cell is the account, not the balance. Read only what follows the
-      // label.
+      // the cell is the account. Read only what follows the label.
       const label = this._leafByText(this.selectors.balance.label, 40);
       if (!label) return null;
       const whole = this._textOf(label.parentElement || label);
@@ -701,23 +715,40 @@ export class EsunAdapter extends BaseBankAdapter {
       return Number.isFinite(n) ? n : null;
     };
 
-    const direct = read();
-    if (direct != null) {
-      return { value: { accountId: sourceAccount?.id, available: direct, currency: CURRENCY }, confidence: 0.95, missingFields: [] };
-    }
+    // Is the form showing the account we were asked about?
+    const selected = () => {
+      if (!sourceAccount) return false;
+      const t = this._comboTrigger(this.selectors.placeholders.source);
+      return !!(t && t.value && this._rowMatcher(sourceAccount)(t.value));
+    };
 
-    // The figure appears only on the form, and only once a source is chosen.
+    const fail = (why) => ({ value: null, confidence: 0, missingFields: [why] });
+
     if (!this.selectors.routes.transferForm.test(this._path())) {
-      const ok = await this.navigateToTransferForm();
-      if (!ok) return super.readBalance(sourceAccount);
+      if (!(await this.navigateToTransferForm())) return super.readBalance(sourceAccount);
     }
-    if (sourceAccount) await this.selectSourceAccount(sourceAccount);
 
-    const after = await this._poll(() => read(), { timeoutMs: 6000 });
-    if (after != null) {
-      return { value: { accountId: sourceAccount?.id, available: after, currency: CURRENCY }, confidence: 0.95, missingFields: [] };
+    if (!selected()) {
+      if (!sourceAccount) return super.readBalance(sourceAccount);
+      if (!(await this.selectSourceAccount(sourceAccount))) return fail("source_not_selectable");
+      if (!(await this._poll(() => (selected() ? true : null), { timeoutMs: 6000 }))) {
+        return fail("source_selection_unconfirmed");
+      }
     }
-    return super.readBalance(sourceAccount);
+
+    // Only now is a number on screen attributable to this account.
+    const value = await this._poll(() => readNumber(), { timeoutMs: 8000 });
+    if (value == null) return fail("balance_not_displayed");
+
+    // The selection must still hold: a re-render could have swapped accounts
+    // between the wait and the read.
+    if (!selected()) return fail("source_changed_while_reading");
+
+    return {
+      value: { accountId: sourceAccount.id, available: value, currency: CURRENCY },
+      confidence: 0.95,
+      missingFields: [],
+    };
   }
 
   /**
