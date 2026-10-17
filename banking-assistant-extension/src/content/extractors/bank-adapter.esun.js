@@ -509,12 +509,21 @@ export class EsunAdapter extends BaseBankAdapter {
     }
     this._click(hit);
 
-    // Both conditions, because either can be true while the other has not
-    // happened yet.
+    // Settle on the field holding what we asked for, not merely on it changing.
+    //
+    // The runner calls selectSourceAccount after readBalance has already
+    // selected that same account to attribute the balance, so a correct pick
+    // leaves the trigger's value byte-identical. Asserting "the value changed"
+    // failed every batch at the first fill step while the form was in fact
+    // right. Either signal is enough: the field shows the target, or it moved
+    // off whatever it held before. The dialog must be closed in both cases,
+    // because either can be true while the other has not happened yet.
     const settled = await this._poll(
       () => {
         const t = this._comboTrigger(placeholderRe);
-        return !this._openModal() && t && (t.value || "") !== before ? true : null;
+        if (!t || this._openModal()) return null;
+        const now = t.value || "";
+        return matches(now) || now !== before ? true : null;
       },
       { timeoutMs: 5000 },
     );

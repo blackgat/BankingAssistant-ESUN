@@ -274,6 +274,29 @@ test("new site: balance is read after its label, not as the first number", async
   assert.equal(r.value.balance, 50000, "must not return the account number");
 });
 
+// The order the runner actually uses: readBalance selects the source to
+// attribute the figure, then the fill loop selects the same source again. The
+// second call cannot observe the field change, because the first call already
+// put the right value there.
+test("new site: re-selecting the account already in the field succeeds", async () => {
+  const doc = newSiteForm();
+  const a = new EsunAdapter({ root: doc, config });
+  const acct = { id: "s1", accountLast5: "12345", label: "零用金" };
+  doc.getElementById("bal").innerHTML =
+    "<div>零用金 0531234567647 可用餘額 TWD 50,000</div>";
+
+  const reading = await a.readBalance(acct);
+  assert.equal(reading.value.balance, 50000);
+
+  const trigger = doc.querySelector(".combo-input");
+  const before = trigger.value;
+  assert.ok(before, "readBalance should have left the account selected");
+
+  const ok = await a.selectSourceAccount(acct);
+  assert.equal(ok, true, "an unchanged but correct field is a successful pick");
+  assert.equal(trigger.value, before, "and the value is expected not to change");
+});
+
 test("new site: a balance that cannot be attributed to the account is refused", async () => {
   // Measured during a real batch: the reader answered 238ms after the batch
   // began — before any source had been chosen — and reported a figure that was
