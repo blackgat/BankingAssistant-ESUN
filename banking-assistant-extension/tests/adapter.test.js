@@ -153,11 +153,49 @@ test("new site: page state comes from the route, not the step text", () => {
   const edit = new EsunAdapter({ root: newSiteForm(), config });
   assert.equal(edit.detectPageState(), "transfer_form");
 
+  // Form-looking markup on the confirm route is still the confirm step.
   const confirm = new EsunAdapter({
-    root: loadDom(`<!DOCTYPE html><html><body><input class="combo-input"></body></html>`, CONFIRM_URL),
+    root: loadDom(
+      `<!DOCTYPE html><html><body><input class="combo-input">
+         <div class="txn-data-item"><div class="info-header">轉出帳號</div></div>
+       </body></html>`,
+      CONFIRM_URL,
+    ),
     config,
   });
   assert.equal(confirm.detectPageState(), "verification");
+});
+
+// What broke job 2 of a real batch: 再轉一筆 pushed the form's path and the
+// waiter accepted it, so the fill began 107ms later against a view that had
+// not mounted. A path the view has not caught up with is not that page yet.
+test("new site: a route whose view has not mounted is not that page yet", () => {
+  const halfMounted = (url) => new EsunAdapter({
+    root: loadDom(`<!DOCTYPE html><html><body><div>載入中</div></body></html>`, url),
+    config,
+  });
+
+  assert.equal(halfMounted(EDIT_URL).detectPageState(), "unknown", "no 轉出帳號 field yet");
+  assert.equal(halfMounted(CONFIRM_URL).detectPageState(), "unknown", "no confirm rows yet");
+  assert.equal(
+    halfMounted("https://ebank.esunbank.com.tw/esb/deposit/twd-transfer/result").detectPageState(),
+    "unknown",
+    "no success wording yet",
+  );
+});
+
+// The same race one layer down, for callers that do not go through the waiter:
+// readBalance selects the source directly.
+test("new site: the picker waits for a field that mounts late", async () => {
+  const doc = newSiteForm();
+  const trigger = doc.querySelector("input.combo-input");
+  const parent = trigger.parentElement;
+  parent.removeChild(trigger);
+  setTimeout(() => parent.appendChild(trigger), 300);
+
+  const a = new EsunAdapter({ root: doc, config });
+  const ok = await a.selectSourceAccount({ id: "s1", accountLast5: "12345", label: "零用金" });
+  assert.equal(ok, true, "a field that arrives late is not a missing picker");
 });
 
 test("new site: the header 登出 control is the login marker", () => {

@@ -388,18 +388,46 @@ export class EsunAdapter extends BaseBankAdapter {
     const { routes } = this.selectors;
     const path = this._path();
 
-    if (routes.verification.test(path)) return { state: PAGE_STATES.VERIFICATION, confidence: 0.99 };
-    if (routes.transferForm.test(path)) return { state: PAGE_STATES.TRANSFER_FORM, confidence: 0.99 };
+    // A route match is not arrival.
+    //
+    // This is a Vue app: 再轉一筆 pushes the new path synchronously and mounts
+    // the view a tick later, so in between the URL says "transfer form" while
+    // the form has no fields yet. Measured on a real batch: job 2 failed 107ms
+    // after it started, at the first lookup of the 轉出帳號 field. On the old
+    // JSF site a path change meant a document load, so the path and the markup
+    // arrived together and this assumption held; it does not here.
+    //
+    // Each state therefore has to show something only the rendered page has.
+    // Reporting UNKNOWN while a view is still mounting is what the caller
+    // wants: its waiter keeps polling and only gives up on its own timeout.
+    const pending = { state: PAGE_STATES.UNKNOWN, confidence: 0 };
+
+    if (routes.verification.test(path)) {
+      const rendered = !!this._doc.querySelector(this.selectors.confirmStep.item);
+      return rendered ? { state: PAGE_STATES.VERIFICATION, confidence: 0.99 } : pending;
+    }
+    if (routes.transferForm.test(path)) {
+      const rendered = !!this._comboTrigger(this.selectors.placeholders.source);
+      return rendered ? { state: PAGE_STATES.TRANSFER_FORM, confidence: 0.99 } : pending;
+    }
     if (routes.completion.test(path)) {
-      // The completion route has never been observed, so corroborate it with
-      // text before claiming a transfer finished.
+      // Corroborated with text, which doubles as the mounted-yet witness. The
+      // runner fails the job outright when readCompletion is unconvincing, so
+      // accepting a half-mounted result page would report a transfer that did
+      // go through as a failure — the one direction that must not happen.
       const looksDone = /(交易完成|交易成功|轉帳成功|交易結果)/.test(this._textOf(this._doc.body));
-      return { state: PAGE_STATES.COMPLETION, confidence: looksDone ? 0.95 : 0.5 };
+      return looksDone ? { state: PAGE_STATES.COMPLETION, confidence: 0.95 } : pending;
     }
     return super.detectPageStateDetailed();
   }
 
   // --- navigation ----------------------------------------------------------
+
+  /** On the form's route with the form actually mounted. */
+  _transferFormReady() {
+    if (!this.selectors.routes.transferForm.test(this._path())) return null;
+    return this._comboTrigger(this.selectors.placeholders.source) ? true : null;
+  }
 
   async navigateToTransferForm() {
     assertActionAllowed("navigateToTransferForm");
@@ -413,10 +441,7 @@ export class EsunAdapter extends BaseBankAdapter {
     if (!entry) return super.navigateToTransferForm();
     this._click(entry);
 
-    const arrived = await this._poll(
-      () => this.selectors.routes.transferForm.test(this._path()) || null,
-      { timeoutMs: 10000 },
-    );
+    const arrived = await this._poll(() => this._transferFormReady(), { timeoutMs: 10000 });
     return !!arrived;
   }
 
@@ -446,7 +471,9 @@ export class EsunAdapter extends BaseBankAdapter {
    * Leaves the dialog closed on every path, including failure.
    */
   async _pickFromCombo(placeholderRe, matches, { tabText } = {}) {
-    const first = this._comboTrigger(placeholderRe);
+    // Wait for the field rather than deciding there is no picker. Callers that
+    // do not go through the page waiter reach this directly.
+    const first = await this._poll(() => this._comboTrigger(placeholderRe), { timeoutMs: 8000 });
     if (!first) return false;
     const before = first.value || "";
 
@@ -820,10 +847,7 @@ export class EsunAdapter extends BaseBankAdapter {
     );
     if (!btn) return super.navigateToNextTransfer();
     this._click(btn);
-    return !!(await this._poll(
-      () => (this.selectors.routes.transferForm.test(this._path()) ? true : null),
-      { timeoutMs: 15000 },
-    ));
+    return !!(await this._poll(() => this._transferFormReady(), { timeoutMs: 15000 }));
   }
 
   async logout() {

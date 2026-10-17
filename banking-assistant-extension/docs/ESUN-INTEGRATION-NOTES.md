@@ -655,6 +655,36 @@ Where the balance definitively lives, should the form turn out not to carry it:
 `accountAlias` and `realAmount` per account, all six present. Attribution there
 is per row and needs no whole-document scan.
 
+### The SPA changes the route before it mounts the view (2026-10-17)
+
+`detectPageStateDetailed` decided the page from the path alone. On the old JSF
+site a path change meant a document load, so the path and the markup arrived
+together. On the Vue app they do not: 再轉一筆 pushes
+`/deposit/twd-transfer/edit` synchronously and mounts the form a tick later.
+
+Measured on a real batch: job 1 completed, job 2 started at 06:38:36.775 and
+failed at 06:38:36.882 — 107ms — at the first lookup of the 轉出帳號 field. The
+runner's page waiter had accepted "transfer form" from the URL while the form
+had no fields in it.
+
+Fixed by giving each state a witness that only the rendered page has:
+
+| State | Witness |
+| --- | --- |
+| `TRANSFER_FORM` | the 轉出帳號 combo trigger exists |
+| `VERIFICATION` | at least one `.txn-data-item` exists |
+| `COMPLETION` | the success wording is present |
+
+A matching path without its witness now reports `UNKNOWN`, so the caller's
+waiter keeps polling and gives up only on its own timeout. `COMPLETION` matters
+most here: the runner fails a job outright when `readCompletion` is
+unconvincing, so accepting a half-mounted result page would have reported a
+transfer that *did* go through as a failure.
+
+Both navigation helpers now wait for the form rather than for the path, and
+`_pickFromCombo` polls for its trigger instead of concluding from one lookup
+that the page has no picker.
+
 ### Before the next batch — what to capture (2026-10-17)
 
 One open question is blocking nothing right now but has no explanation: on
