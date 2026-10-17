@@ -323,3 +323,47 @@ const txt = e => (e?.textContent||"").replace(/\s+/g," ").trim();
 JSON.stringify([...document.querySelectorAll("input[type=radio]")].map(r => ({
   label: txt(r.closest("label")) || txt(r.parentElement), checked: r.checked })));
 ```
+
+### The 資料確認 step (probed 2026-10-17, no transfer made)
+
+Route `/esb/deposit/twd-transfer/confirm`. The step really is in the path:
+`edit` → `confirm`. Expect `result` or similar for the third, unconfirmed.
+
+> #### The one that could move money by accident
+>
+> The final button on this step is **`<button class="btn-main-fill">立即交易</button>`**.
+> The 下一步 button on the *edit* step has **the same class**, `btn-main-fill`.
+>
+> A submit selector written as `.btn-main-fill` would therefore press 下一步 on the
+> edit page and **execute the transfer** on the confirm page. Match on the button's
+> text, and treat 立即交易 the way `clickFinalConfirm` is treated: a name with no
+> implementation. The other button here is 修改 (`btn-main-border`), which goes back.
+
+> #### The password now lives on the page the extension parks on
+>
+> The confirm step carries `<input type="password" placeholder="請輸入您的使用者密碼">`.
+> The user authorises by typing their banking password right here, rather than on a
+> later screen.
+>
+> Nothing in the extension can fill it — there is no action for it and the sanitizer
+> refuses credential-shaped keys — but the boundary is now physically on the same
+> page as the form the adapter fills, so keep it that way deliberately. Add 立即交易
+> and this field to whatever the rewrite uses as its refusal list.
+
+Label-to-value pairing on this step, as measured (values themselves not recorded):
+
+| Field | Label element | Value |
+|---|---|---|
+| 轉出帳號 | `div.info-header` | next sibling `div`, contains digits |
+| 轉帳金額 | `div.info-header.mib-font-bold` | **not a sibling** — needs a different walk |
+| 備註給自己 / 給對方 | `div.info-header` | next sibling `div`; an empty memo renders as `-` |
+| 轉入帳號 | matched an `<a class="mib-underline mib-obvious">` | the probe hit a link, not a label cell; needs a tighter match |
+
+So the old "find the label cell, take its sibling" shape survives for the source
+account and both memos, but not for the amount, and the payee needs a selector that
+does not collide with a link. An empty memo reading as `-` matters: the policy
+compares memos, and `-` is not the empty string.
+
+The wizard words 資料編輯 / 資料確認 are both present on this step and both carry
+class `content`, with nothing distinguishing the active one — another reason to read
+the route instead of the step text.
