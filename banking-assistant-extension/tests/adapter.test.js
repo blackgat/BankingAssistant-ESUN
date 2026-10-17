@@ -33,38 +33,6 @@ test("readBalance extracts the matching account balance with high confidence", a
   assert.equal(r.value.accountLast5, "12345");
 });
 
-test("readBalance opens the transfer form when it isn't showing, then reads 可用餘額", async () => {
-  // A minimal E.SUN-shaped page: a dashboard with only the transfer menu link.
-  // Clicking it swaps in a transfer form; choosing the source reveals 可用餘額,
-  // mirroring the bank's AJAX behaviour.
-  const doc = loadDom(`<!DOCTYPE html><html><body>
-    <a class="log_out" href="#logout">登出</a>
-    <div id="app"><a id="menu">即時 / 預約轉帳</a></div>
-  </body></html>`);
-  doc.getElementById("menu").addEventListener("click", () => {
-    doc.getElementById("app").innerHTML = `
-      <div class="step"><dt class="current">Step1資料編輯</dt></div>
-      <form class="transfer-form">
-        <dl><dt>轉出帳號</dt><dd>
-          <select><option value="">請選擇</option><option value="s1">活期存款 ****12345</option></select>
-        </dd></dl>
-        <div id="bal"></div>
-      </form>`;
-    const sel = doc.querySelector("form select");
-    sel.addEventListener("change", () => {
-      if (sel.value) doc.getElementById("bal").innerHTML = `<span>可用餘額<br><span>50,000</span></span>`;
-    });
-  });
-
-  const a = new EsunAdapter({ root: doc, config });
-  assert.equal(a._controlByLabel(a.selectors.labels.source, "select"), null, "no form to begin with");
-
-  const r = await a.readBalance(source);
-  assert.ok(r.confidence >= 0.9, `confidence ${r.confidence}`);
-  assert.equal(r.value.balance, 50000);
-  assert.equal(r.value.sourceAccountId, source.id);
-});
-
 test("extractCurrentBalance convenience wrapper works", async () => {
   const a = adapterFor("bank-home.html");
   assert.equal((await a.extractCurrentBalance(source.id)).balance, 50000);
@@ -125,4 +93,128 @@ test("submitFormToVerificationPage clicks the next button, never a final-confirm
   const res = await a.submitFormToVerificationPage();
   assert.equal(res.ok, true);
   assert.equal(clicked, "ba-next");
+});
+// --- the 2026-10-17 redesign --------------------------------------------
+// E.SUN replaced the JSF iframe with a Vue app. These exercise the paths that
+// only exist on the new site; the fixtures above still cover the generic bank,
+// which the adapter falls back to when it does not recognise E.SUN's markup.
+
+const EDIT_URL = "https://ebank.esunbank.com.tw/esb/deposit/twd-transfer/edit";
+const CONFIRM_URL = "https://ebank.esunbank.com.tw/esb/deposit/twd-transfer/confirm";
+
+/** A page shaped like the redesigned transfer form, with a working picker. */
+function newSiteForm({ rows = ["000000012345 零用金", "000000099999 其他"] } = {}) {
+  const doc = loadDom(
+    `<!DOCTYPE html><html><body>
+      <header><div class="header-option-entry-button"><span class="header-option-entry-text">登出</span></div></header>
+      <form>
+        <div class="combo-input-wrapper input-mode">
+          <input class="combo-input" readonly placeholder="請選擇轉出帳號">
+        </div>
+        <div class="combo-input-wrapper input-mode">
+          <input class="combo-input" readonly placeholder="請選擇轉入帳號">
+        </div>
+        <label><input type="radio" name="g1">常用/約定帳號</label>
+        <label><input type="radio" name="g2">即時轉帳</label>
+        <input type="text" placeholder="請輸入轉帳金額">
+        <div><div class="info-header">備註給自己</div><input type="text" placeholder="限20個中英數字"></div>
+        <div><div class="info-header">備註給對方</div><input type="text" placeholder="限20個中英數字"></div>
+        <div id="bal"></div>
+        <button class="btn-main-fill" type="button">下一步</button>
+      </form>
+      <div id="host"></div>
+    </body></html>`,
+    EDIT_URL,
+  );
+
+  // Clicking a readOnly trigger opens the dialog, as the real app does.
+  for (const trigger of doc.querySelectorAll("input.combo-input")) {
+    trigger.addEventListener("click", () => {
+      doc.getElementById("host").innerHTML = `
+        <div class="combo-modal" role="dialog">
+          <div class="modal-header"><button class="toggle" aria-label="關閉"></button></div>
+          <div class="custom-area"><ul>${rows.map((r) => `<li role="button">${r}</li>`).join("")}</ul></div>
+        </div>`;
+      for (const li of doc.querySelectorAll(".combo-modal li")) {
+        li.addEventListener("click", () => {
+          trigger.value = li.textContent;
+          doc.getElementById("host").innerHTML = "";
+          doc.getElementById("bal").innerHTML = `<div><span>可用餘額</span><span>50,000</span></div>`;
+        });
+      }
+      doc.querySelector(".combo-modal button[aria-label='關閉']")
+        .addEventListener("click", () => { doc.getElementById("host").innerHTML = ""; });
+    });
+  }
+  return doc;
+}
+
+test("new site: page state comes from the route, not the step text", () => {
+  const edit = new EsunAdapter({ root: newSiteForm(), config });
+  assert.equal(edit.detectPageState(), "transfer_form");
+
+  const confirm = new EsunAdapter({
+    root: loadDom(`<!DOCTYPE html><html><body><input class="combo-input"></body></html>`, CONFIRM_URL),
+    config,
+  });
+  assert.equal(confirm.detectPageState(), "verification");
+});
+
+test("new site: the header 登出 control is the login marker", () => {
+  const a = new EsunAdapter({ root: newSiteForm(), config });
+  assert.equal(a.detectLoginState(), "logged_in");
+});
+
+test("new site: selecting a source drives the picker dialog and reveals 可用餘額", async () => {
+  const doc = newSiteForm();
+  const a = new EsunAdapter({ root: doc, config });
+  const acct = { id: "s1", accountLast5: "12345", label: "零用金" };
+
+  assert.equal(await a.selectSourceAccount(acct), true);
+  assert.match(doc.querySelector("input.combo-input").value, /12345/);
+  assert.equal(doc.querySelectorAll(".combo-modal").length, 0, "dialog closed after choosing");
+
+  const r = await a.readBalance(acct);
+  assert.ok(r.confidence >= 0.9, `confidence ${r.confidence}`);
+  assert.equal(r.value.available, 50000);
+});
+
+test("new site: no matching row closes the picker instead of leaving it open", async () => {
+  const doc = newSiteForm({ rows: ["000000077777 別的帳戶"] });
+  const a = new EsunAdapter({ root: doc, config });
+
+  const ok = await a.selectSourceAccount({ id: "s1", accountLast5: "12345", label: "零用金" });
+  assert.equal(ok, false, "reports failure rather than picking something else");
+  assert.equal(doc.querySelectorAll(".combo-modal").length, 0, "dialog must not be left covering the form");
+});
+
+test("new site: 下一步 is matched by text, and 立即交易 is refused", async () => {
+  // Both buttons carry btn-main-fill on the real site, which is why the adapter
+  // matches on text. If it ever matched the class, this is the transfer it
+  // would execute.
+  const doc = loadDom(
+    `<!DOCTYPE html><html><body><input class="combo-input">
+       <button class="btn-main-fill">立即交易</button>
+     </body></html>`,
+    CONFIRM_URL,
+  );
+  const a = new EsunAdapter({ root: doc, config });
+  let clicked = false;
+  doc.querySelector("button").addEventListener("click", () => { clicked = true; });
+
+  await a.submitFormToVerificationPage();
+  assert.equal(clicked, false, "must never press 立即交易");
+
+  // And the guard refuses even a direct attempt.
+  assert.throws(() => a._click(doc.querySelector("button")), /forbidden/);
+});
+
+test("new site: completion stays below the runner's threshold until verified", () => {
+  const doc = loadDom(
+    `<!DOCTYPE html><html><body><input class="combo-input">交易完成 123456789</body></html>`,
+    "https://ebank.esunbank.com.tw/esb/deposit/twd-transfer/result",
+  );
+  const r = new EsunAdapter({ root: doc, config }).readCompletion();
+  assert.ok(r.confidence < 0.9, "an unverified completion page must not read as proof");
+  assert.ok(r.missingFields.join().includes("unverified"));
 });

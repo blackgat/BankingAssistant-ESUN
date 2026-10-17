@@ -20,11 +20,15 @@ export function fixtureHtml(name) {
 
 /**
  * Build a jsdom document from HTML and install its window globals.
+ *
+ * The url matters since E.SUN's redesign: the adapter reads the wizard step
+ * from the route, so a test that exercises a step has to say which one.
  * @param {string} html
+ * @param {string} [url]
  * @returns {Document}
  */
-export function loadDom(html) {
-  const dom = new JSDOM(html, { url: "https://ebank.esunbank.com.tw/transfer" });
+export function loadDom(html, url = "https://ebank.esunbank.com.tw/transfer") {
+  const dom = new JSDOM(html, { url });
   const w = dom.window;
   global.window = w;
   global.document = w.document;

@@ -1,36 +1,149 @@
 // E.SUN (玉山銀行) adapter.
 //
 // =====================================================================
-//  These selectors were checked against the real E.SUN online banking DOM
-//  (2026-07-19) — login marker, wizard steps, transfer-form labels, mode
-//  radios, 可用餘額, the 資料確認 table, and the 交易結果 serial. The DOM notes
-//  and re-inspection snippets live in docs/ESUN-INTEGRATION-NOTES.md.
+//  Rewritten 2026-10-17 for E.SUN's redesign. The bank replaced a JSF
+//  widget inside a same-origin iframe with a Vue single-page app at
+//  /esb/, so nothing below survives from the previous adapter except the
+//  shape of its contract with the runner.
 //
-//  The `pages`/`accounts` groups still describe the demo fixtures
-//  (tests/fixtures/*.html): they only serve as the fallback scorer for pages
-//  without a wizard step. If E.SUN redesigns, re-inspect each page, update the
-//  right-hand strings here, update the fixtures to match, and run `npm test`.
-//  See README "替換銀行 selector".
+//  What the redesign changed, and why this file looks the way it does:
+//    - There is no iframe. The app is the top document.
+//    - The wizard step is in the URL (/deposit/twd-transfer/edit|confirm),
+//      which is a far steadier signal than the step text it replaces.
+//    - Source and payee are readOnly combo inputs that open a dialog; their
+//      value cannot be set directly.
+//    - 下一步 (advance) and 立即交易 (execute the transfer) share the class
+//      btn-main-fill, so buttons are matched on text and never on class.
+//    - The session logs itself out on a timer and warns with a dialog that
+//      can appear mid-batch.
+//
+//  Verified on the live bank 2026-10-17 by read-only probes: routes, login
+//  marker, form controls, both radio groups, the picker dialog, the confirm
+//  step and its buttons. NOT verified: the completion step, which needs a
+//  real transfer — readCompletion fails closed until it is.
+//
+//  DOM evidence and re-inspection probes: docs/ESUN-INTEGRATION-NOTES.md §11.
 // =====================================================================
 
-import { PAGE_STATES, CURRENCY } from "../../core/types.js";
+import { PAGE_STATES, CURRENCY, LOGIN_STATES } from "../../core/types.js";
 import { last5 as toLast5, maskName, maskReference } from "../../core/sanitizer.js";
 import { BaseBankAdapter, parseAmount } from "./bank-adapter.example.js";
-import {
-  assertActionAllowed,
-  selectOptionBy,
-  setNativeValue,
-  safeClick,
-} from "../actions/transfer-form-actions.js";
+import { assertActionAllowed, setNativeValue, safeClick } from "../actions/transfer-form-actions.js";
+
+/**
+ * Button labels this adapter must never click, whatever the selector that
+ * reached them. 立即交易 executes the transfer; 立即登出 ends the session in the
+ * middle of a batch. Checked on every click rather than trusted to callers.
+ */
+const REFUSED_BUTTON_TEXT = /立即交易|立即登出|確認轉帳|確認送出/;
 
 export const ESUN_SELECTORS = Object.freeze({
   bankId: "esun",
+
+  // The step lives in the path now. Matching the route is both cheaper and
+  // steadier than reading Chinese step text out of the DOM.
+  routes: {
+    app: /^\/esb(\/|$)/,
+    transferForm: /\/deposit\/twd-transfer\/edit\b/,
+    verification: /\/deposit\/twd-transfer\/confirm\b/,
+    // Unconfirmed: the third step has not been observed. Kept broad on purpose
+    // and corroborated by text before it is believed.
+    completion: /\/deposit\/twd-transfer\/(result|finish|success|complete)\b/,
+  },
+
   login: {
-    // Verified on the real E.SUN banking iframe: the logout control is
-    // <a class="log_out">. The data-action/.ba-logout entries keep the demo
-    // fixtures working.
-    loggedInMarkers: ["a.log_out", ".log_out", "[data-action='logout']", ".ba-logout"],
-    loginFormMarkers: ["input[type='password']", ".login-form", "#loginForm"],
+    // a.log_out is gone. The header's 登出 control is the marker; match its
+    // text, because the control is a div and its classes are generic.
+    logoutText: /^登出$/,
+    headerScope: "header, [class*='header']",
+    countdown: ".countdown-block",
+    loggedInMarkers: [".header-option-entry-button", ".ba-logout"],
+    loginFormMarkers: ["input[type='password'].login", ".login-form", "#loginForm"],
+    logoutTextPattern: /登出|logout|sign\s*out/i,
+  },
+
+  // The session expires on a timer and warns first. The dialog sits in the DOM
+  // hidden, so presence alone means nothing — it has to be visible.
+  session: {
+    warningText: /即將被登出/,
+    keepAliveText: /繼續使用/,
+    logoutNowText: /立即登出/,
+  },
+
+  nav: {
+    // 臺, not 台. The entry is a button, not a menu link.
+    transferButtonText: /臺幣轉帳|台幣轉帳/,
+  },
+
+  // Source and payee pickers. The trigger is readOnly; clicking it opens a
+  // dialog whose rows read "<account number> <nickname>".
+  combo: {
+    trigger: "input.combo-input",
+    wrapper: "[class*='combo-input-wrapper']",
+    openClass: "modal-open",
+    modal: ".combo-modal",
+    row: "li[role='button']",
+    selectedRow: "li.selected",
+    closeButton: ".modal-header button[aria-label='關閉']",
+  },
+
+  // Placeholders identify the fields more reliably than the surrounding labels,
+  // which are shared between the two memo inputs.
+  placeholders: {
+    source: /請選擇轉出帳號/,
+    payee: /請選擇轉入帳號/,
+    amount: /請輸入轉帳金額/,
+    memo: /個中英數字/,
+  },
+
+  labels: {
+    source: /轉出帳號/,
+    payee: /轉入帳號/,
+    amount: /轉帳金額/,
+    memoSelf: /備註給自己|給自己/,
+    memoOther: /備註給對方|給對方/,
+  },
+
+  // Two independent radio groups now, not one choice. Picking across them was
+  // what the old single `modes` map did by accident.
+  modes: {
+    payeeSource: { recent: /最近轉帳/, designated: /常用|約定/, manual: /自行輸入/ },
+    timing: { instant: /即時轉帳/, scheduledOnce: /預約單日/, scheduledCycle: /預約週期/ },
+  },
+
+  submit: {
+    // Text only. btn-main-fill is also the class of 立即交易 on the confirm step.
+    nextText: /^下一步$/,
+  },
+
+  balance: { label: /可用餘額/ },
+
+  confirmStep: {
+    labelCell: ".info-header",
+    // An empty memo renders as "-" on the confirm step, not as an empty string.
+    emptyValue: "-",
+  },
+
+  logout: { triggerText: /^登出$/ },
+
+  // --- generic fallbacks ---------------------------------------------------
+  // These describe the offline demo bank in tests/fixtures, not E.SUN. They are
+  // not leftovers from the old site: the fixtures exist so the runner can be
+  // exercised end to end without a bank at all, which is independent of what
+  // E.SUN does to its markup. Every override below delegates to the base
+  // adapter when it does not recognise the live site, and these are what the
+  // base adapter then reads.
+  accounts: { rowSelector: ".account-row", nameSelector: ".account-name", balanceSelector: ".account-balance", last5Attr: "data-account-last5" },
+  payees: { selectSelector: "select.ba-payee", optionLast5Attr: "data-last5", optionNameAttr: "data-name" },
+  form: {
+    navToTransfer: "[data-nav='transfer']",
+    sourceSelect: "select.ba-source",
+    sourceOptionLast5Attr: "data-last5",
+    payeeSelect: "select.ba-payee",
+    amountInput: ".ba-amount",
+    memoShortInput: ".ba-memo-short",
+    memoLongInput: ".ba-memo-long",
+    submitToVerification: ".ba-next",
   },
   pages: {
     [PAGE_STATES.HOME]: {
@@ -39,7 +152,6 @@ export const ESUN_SELECTORS = Object.freeze({
       text: null,
     },
     [PAGE_STATES.TRANSFER_FORM]: {
-      // E.SUN: 轉帳 form with 轉出帳號 / 轉入帳號 / 金額.
       require: ["form.transfer-form", ".ba-amount"],
       forbid: [".verification-summary", ".transfer-result"],
       text: null,
@@ -60,30 +172,6 @@ export const ESUN_SELECTORS = Object.freeze({
       text: /(確定登出|確認登出|是否登出)/,
     },
   },
-  accounts: {
-    rowSelector: ".account-row",
-    nameSelector: ".account-name",
-    balanceSelector: ".account-balance",
-    last5Attr: "data-account-last5",
-  },
-  payees: {
-    selectSelector: "select.ba-payee",
-    optionLast5Attr: "data-last5",
-    optionNameAttr: "data-name",
-  },
-  form: {
-    navToTransfer: "[data-nav='transfer']",
-    // Real E.SUN: the transfer entry is a left-menu item that loads a widget via
-    // _leftMenuLoadWidget(); it has no href/id, so match it by visible text.
-    navToTransferText: /即時.*預約.*轉帳|預約轉帳|即時轉帳/,
-    sourceSelect: "select.ba-source", // 轉出帳號
-    sourceOptionLast5Attr: "data-last5",
-    payeeSelect: "select.ba-payee", // 轉入帳號（約定）
-    amountInput: ".ba-amount", // 金額
-    memoShortInput: ".ba-memo-short", // 摘要
-    memoLongInput: ".ba-memo-long", // 附言
-    submitToVerification: ".ba-next", // 下一步 -> 驗證頁（非最終確認）
-  },
   verification: {
     container: ".verification-summary",
     sourceLast5: "[data-field='source-last5']",
@@ -99,267 +187,378 @@ export const ESUN_SELECTORS = Object.freeze({
     completionText: "[data-field='completion-text']",
     nextTransfer: "[data-action='next-transfer']",
   },
-  logout: {
-    // Verified: <a class="log_out"> in the banking iframe.
-    trigger: "a.log_out, [data-action='logout']",
-  },
-  // Real E.SUN: the transfer flow is a 3-step wizard inside one widget. The step
-  // indicator (<div class="step"> ... <dt class="current">資料編輯/資料確認/交易結果</dt>)
-  // is the reliable page-state signal, mapping onto our page states.
-  wizard: {
-    stepCurrent: ".step .current, .step dt.current, dt.current",
-    formStepText: /資料編輯/,
-    verifyStepText: /資料確認/,
-    completeStepText: /交易結果/,
-  },
-  // Real E.SUN form controls carry no stable id/class, so locate each by the
-  // visible label text of its row/section (verified on the live transfer form).
-  labels: {
-    source: /轉出帳號/,
-    payee: /轉入帳號/,
-    amount: /轉帳金額|金額/,
-    memoSelf: /給自己|摘要/, // -> memoShort (撰寫備註給自己)
-    memoOther: /給對方|附言/, // -> memoLong (撰寫備註給對方)
-    nextLinkText: /下一步/, // advance to 資料確認 (NEVER the final 確認/送出)
-  },
-  // Transfer-form mode radios (verified labels). Selected before filling so the
-  // designated-payee dropdown is enabled and the transfer is a single immediate one.
-  modes: {
-    designated: /約定/, // 轉入帳號: 約定常用帳號
-    instant: /即時/, // 轉帳方式: 即時預約單日
-  },
 });
 
 export class EsunAdapter extends BaseBankAdapter {
-  /**
-   * @param {{ root?: Document|HTMLElement, config: object }} opts
-   */
   constructor({ root, config } = {}) {
     super({ root, config, selectors: ESUN_SELECTORS });
   }
 
+  // --- small helpers -------------------------------------------------------
+
+  get _doc() {
+    return this.root?.ownerDocument || this.root || document;
+  }
+
+  _path() {
+    try {
+      return this._doc.defaultView?.location?.pathname || "";
+    } catch {
+      return "";
+    }
+  }
+
+  /** True when the document actually performs layout (a browser, not jsdom). */
+  _hasLayout() {
+    return (this._doc.documentElement?.clientHeight || 0) > 0;
+  }
+
   /**
-   * E.SUN drives the transfer as a 3-step wizard inside one widget, so the page
-   * state comes from the step indicator rather than separate URLs. Falls back to
-   * the generic selector scoring (used by the demo fixtures and unit tests) when
-   * no wizard step is present. Overriding the *Detailed variant means the plain
-   * detectPageState() inherits the same logic.
-   * @returns {{state: string, confidence: number}}
+   * Hidden means declared hidden, not merely measuring zero.
+   *
+   * The session-timeout dialog sits in the DOM hidden, so presence alone cannot
+   * be trusted — but geometry cannot be trusted either: under jsdom every
+   * element reports no client rects and a null offsetParent, which would mark
+   * the whole page invisible. So read the declared style always, and consult
+   * geometry only where something is really being laid out.
    */
+  _visible(el) {
+    if (!el) return false;
+    if (el.hidden) return false;
+    const cs = this._doc.defaultView?.getComputedStyle?.(el);
+    if (cs && (cs.display === "none" || cs.visibility === "hidden" || cs.opacity === "0")) return false;
+    if (this._hasLayout()) return el.offsetParent !== null || el.getClientRects().length > 0;
+    return true;
+  }
+
+  _textOf(el) {
+    return (el?.textContent || "").replace(/\s+/g, " ").trim();
+  }
+
+  /**
+   * Poll until `fn` returns something truthy or the deadline passes.
+   *
+   * Everything that waits on this app goes through here. The picker dialog was
+   * observed absent from a querySelector while plainly open on screen — it is
+   * re-rendered rather than shown — so a single check can miss a thing that is
+   * there. "Not found yet" means keep waiting, never "not there".
+   */
+  async _poll(fn, { timeoutMs = 6000, everyMs = 120 } = {}) {
+    const deadline = Date.now() + timeoutMs;
+    for (;;) {
+      try {
+        const v = fn();
+        if (v) return v;
+      } catch {
+        // A mid-render DOM can throw; that is also "not yet".
+      }
+      if (Date.now() >= deadline) return null;
+      await new Promise((r) => setTimeout(r, everyMs));
+    }
+  }
+
+  /** Click, refusing the buttons that must never be pressed by this extension. */
+  _click(el) {
+    if (!el) return false;
+    const label = this._textOf(el) || el.getAttribute?.("aria-label") || "";
+    if (REFUSED_BUTTON_TEXT.test(label)) {
+      throw new Error(`refused to click a forbidden control: ${label.slice(0, 20)}`);
+    }
+    return safeClick(el);
+  }
+
+  /**
+   * Whether this document is E.SUN's live app.
+   *
+   * Everything below delegates to the base adapter when this is false, so the
+   * offline fixtures and the demo keep working unchanged — and so none of the
+   * live-site polling runs against a page that will never satisfy it.
+   */
+  _isEsunApp() {
+    if (this.selectors.routes.app.test(this._path())) return true;
+    return !!this._doc.querySelector(this.selectors.combo.trigger);
+  }
+
+  _all(sel) {
+    return Array.from(this._doc.querySelectorAll(sel));
+  }
+
+  /** Leaf element whose trimmed text matches, searched in document order. */
+  _leafByText(re, max = 40) {
+    return this._all("*").find(
+      (e) => e.children.length === 0 && re.test(this._textOf(e)) && this._textOf(e).length <= max,
+    );
+  }
+
+  _inputByPlaceholder(re) {
+    return this._all("input,textarea").find((i) => re.test(i.placeholder || ""));
+  }
+
+  /**
+   * The first memo-shaped input that follows a label in document order.
+   *
+   * Walking up from the input finds the same label for both memo fields, so the
+   * two are indistinguishable that way. Going forward from the label is not.
+   */
+  _inputAfterLabel(labelRe, inputRe) {
+    const label = this._leafByText(labelRe);
+    if (!label) return null;
+    const inputs = this._all("input,textarea").filter((i) => inputRe.test(i.placeholder || ""));
+    return (
+      inputs.find(
+        (i) => label.compareDocumentPosition(i) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ) || null
+    );
+  }
+
+  // --- session -------------------------------------------------------------
+
+  /** True when the "about to be logged out" dialog is on screen. */
+  sessionWarningOpen() {
+    const { warningText } = this.selectors.session;
+    const node = this._all("[class*='modal'],[role='dialog']").find(
+      (m) => this._visible(m) && warningText.test(this._textOf(m)),
+    );
+    return !!node;
+  }
+
+  // --- login / page state --------------------------------------------------
+
+  detectLoginState() {
+    if (!this._isEsunApp()) return super.detectLoginState();
+    const { logoutText, headerScope } = this.selectors.login;
+    const inHeader = this._all(`${headerScope} *`).some(
+      (e) => e.children.length === 0 && logoutText.test(this._textOf(e)),
+    );
+    if (inHeader) return LOGIN_STATES.LOGGED_IN;
+    if (this._all(this.selectors.login.countdown).some((e) => this._visible(e))) {
+      return LOGIN_STATES.LOGGED_IN;
+    }
+    return super.detectLoginState();
+  }
+
   detectPageStateDetailed() {
-    const w = this.selectors.wizard;
-    const cur = w && this._q(w.stepCurrent);
-    const t = cur ? cur.textContent || "" : "";
-    if (t) {
-      if (w.verifyStepText.test(t)) return { state: PAGE_STATES.VERIFICATION, confidence: 0.99 };
-      if (w.completeStepText.test(t)) return { state: PAGE_STATES.COMPLETION, confidence: 0.99 };
-      if (w.formStepText.test(t)) return { state: PAGE_STATES.TRANSFER_FORM, confidence: 0.99 };
+    if (!this._isEsunApp()) return super.detectPageStateDetailed();
+    const { routes } = this.selectors;
+    const path = this._path();
+
+    if (routes.verification.test(path)) return { state: PAGE_STATES.VERIFICATION, confidence: 0.99 };
+    if (routes.transferForm.test(path)) return { state: PAGE_STATES.TRANSFER_FORM, confidence: 0.99 };
+    if (routes.completion.test(path)) {
+      // The completion route has never been observed, so corroborate it with
+      // text before claiming a transfer finished.
+      const looksDone = /(交易完成|交易成功|轉帳成功|交易結果)/.test(this._textOf(this._doc.body));
+      return { state: PAGE_STATES.COMPLETION, confidence: looksDone ? 0.95 : 0.5 };
     }
     return super.detectPageStateDetailed();
   }
 
-  /**
-   * The transfer entry is a left-menu link that loads a widget via JS; match it
-   * by visible text and click it. Falls back to the generic selector.
-   */
+  // --- navigation ----------------------------------------------------------
+
   async navigateToTransferForm() {
     assertActionAllowed("navigateToTransferForm");
-    if (this.detectPageState() === PAGE_STATES.TRANSFER_FORM) {
-      return { ok: true, message: "already on transfer form" };
-    }
-    const re = this.selectors.form.navToTransferText;
-    const link = re && this._qa("a").find((a) => re.test((a.textContent || "").trim()));
-    if (link) {
-      link.click();
-      return { ok: true, message: "clicked transfer menu" };
-    }
-    return super.navigateToTransferForm();
-  }
+    if (!this._isEsunApp()) return super.navigateToTransferForm();
+    if (this.selectors.routes.transferForm.test(this._path())) return true;
 
-  // --- Label-based form fill (E.SUN fields have no stable id/class) ----------
-  // Each override tries the real E.SUN label-based path; if the labelled control
-  // is not found (e.g. the demo fixtures / unit tests) it falls back to the
-  // generic selector behaviour in BaseBankAdapter.
-
-  _transferForm() {
-    return this._qa("form").find((f) => /轉出帳號|轉入帳號|轉帳金額/.test(f.textContent || "")) || null;
-  }
-
-  /** Visible label text associated with a form control (matches the verified probe). */
-  _labelTextFor(el) {
-    const box = el.closest("dd,td,li,p,div");
-    const prev = box && box.previousElementSibling;
-    const dl = el.closest("tr,dl");
-    const lab = dl && dl.querySelector("dt,th,label");
-    return (
-      el.getAttribute("aria-label") ||
-      (prev && prev.textContent) ||
-      (lab && lab.textContent) ||
-      ""
-    ).trim();
-  }
-
-  _controlByLabel(labelRe, tag) {
-    const form = this._transferForm();
-    if (!form || !labelRe) return null;
-    return [...form.querySelectorAll(tag)].find((el) => labelRe.test(this._labelTextFor(el))) || null;
-  }
-
-  _optionMatchesAccount(opt, acct) {
-    const l5 = toLast5(opt.textContent);
-    if (acct.accountLast5 && l5 === acct.accountLast5) return true;
-    return this._matchesAccount(acct, { displayName: (opt.textContent || "").trim(), accountLast5: l5 });
-  }
-
-  /** Text label associated with a radio (its <label for>, trailing text, or parent). */
-  _radioLabelText(r) {
-    if (r.id) {
-      const L = [...this.root.querySelectorAll("label")].find((l) => l.htmlFor === r.id);
-      if (L && (L.textContent || "").trim()) return L.textContent.trim();
-    }
-    let n = r.nextSibling,
-      s = "",
-      g = 0;
-    while (n && g < 4 && s.length < 14) {
-      s += n.textContent || n.nodeValue || "";
-      n = n.nextSibling;
-      g++;
-    }
-    if (s.trim()) return s.trim();
-    return r.parentElement ? (r.parentElement.textContent || "").trim() : "";
-  }
-
-  /** Click the transfer-form radio whose label matches re (idempotent, best-effort). */
-  _selectRadioByText(re) {
-    const form = this._transferForm();
-    if (!form || !re) return false;
-    const target = [...form.querySelectorAll("input[type=radio]")].find((r) =>
-      re.test(this._radioLabelText(r)),
+    const { transferButtonText } = this.selectors.nav;
+    const entry = this._all("button,a,[role='button']").find(
+      (e) => this._visible(e) && transferButtonText.test(this._textOf(e)),
     );
-    if (!target) return false;
-    if (!target.checked) target.click();
+    if (!entry) return super.navigateToTransferForm();
+    this._click(entry);
+
+    const arrived = await this._poll(
+      () => this.selectors.routes.transferForm.test(this._path()) || null,
+      { timeoutMs: 10000 },
+    );
+    return !!arrived;
+  }
+
+  // --- the combo pickers ---------------------------------------------------
+
+  _comboTrigger(placeholderRe) {
+    return this._all(this.selectors.combo.trigger).find((i) => placeholderRe.test(i.placeholder || "")) || null;
+  }
+
+  _openModal() {
+    const m = this._doc.querySelector(this.selectors.combo.modal);
+    return m && this._visible(m) ? m : null;
+  }
+
+  async _closePicker() {
+    const modal = this._openModal();
+    if (!modal) return true;
+    const close = modal.querySelector(this.selectors.combo.closeButton);
+    if (close) this._click(close);
+    // Escape does not dismiss this dialog, so there is no key fallback worth
+    // trying; the caller re-navigates if this fails.
+    return !!(await this._poll(() => (this._openModal() ? null : true), { timeoutMs: 3000 }));
+  }
+
+  /**
+   * Open the picker, click the row matching `matches`, confirm it took.
+   * Leaves the dialog closed on every path, including failure.
+   */
+  async _pickFromCombo(placeholderRe, matches) {
+    const trigger = this._comboTrigger(placeholderRe);
+    if (!trigger) return false;
+
+    const before = trigger.value || "";
+    this._click(trigger);
+
+    const modal = await this._poll(() => this._openModal(), { timeoutMs: 6000 });
+    if (!modal) return false;
+
+    const rows = await this._poll(() => {
+      const r = Array.from(modal.querySelectorAll(this.selectors.combo.row));
+      return r.length ? r : null;
+    }, { timeoutMs: 4000 });
+    if (!rows) {
+      await this._closePicker();
+      return false;
+    }
+
+    const hit = rows.find((r) => matches(this._textOf(r)));
+    if (!hit) {
+      // Never leave the dialog open: it covers the form and the next step would
+      // fail for an unrelated reason.
+      await this._closePicker();
+      return false;
+    }
+    this._click(hit);
+
+    // Both conditions, because either can be true while the other has not
+    // happened yet.
+    const settled = await this._poll(
+      () => (!this._openModal() && (trigger.value || "") !== before ? true : null),
+      { timeoutMs: 5000 },
+    );
+    if (!settled) await this._closePicker();
+    return !!settled;
+  }
+
+  /** Match a picker row against a configured account: last-5 and/or nickname. */
+  _rowMatcher(acct) {
+    const last5 = String(acct?.accountLast5 || "").replace(/\D/g, "");
+    const pattern = acct?.displayNamePattern ? new RegExp(acct.displayNamePattern) : null;
+    const label = acct?.label || "";
+    return (text) => {
+      const digits = text.replace(/\D/g, "");
+      if (last5 && digits.endsWith(last5)) return true;
+      if (pattern && pattern.test(text)) return true;
+      return !!label && text.includes(label);
+    };
+  }
+
+  // --- radios --------------------------------------------------------------
+
+  _radioLabelText(r) {
+    const wrap = r.closest("label");
+    if (wrap) return this._textOf(wrap);
+    if (r.id) {
+      const l = this._doc.querySelector(`label[for="${CSS.escape(r.id)}"]`);
+      if (l) return this._textOf(l);
+    }
+    return this._textOf(r.parentElement);
+  }
+
+  _selectRadio(re) {
+    const r = this._all("input[type='radio']").find((x) => re.test(this._radioLabelText(x)));
+    if (!r) return false;
+    if (r.checked) return true;
+    this._click(r);
     return true;
   }
 
+  // --- fills ---------------------------------------------------------------
+
   async selectSourceAccount(sourceAccount) {
     assertActionAllowed("selectSourceAccount");
-    this._selectRadioByText(this.selectors.modes.instant); // E.SUN: ensure 即時 (single transfer)
-    const select = this._controlByLabel(this.selectors.labels.source, "select");
-    if (select) {
-      const ok = selectOptionBy(select, (opt) => this._optionMatchesAccount(opt, sourceAccount));
-      return { ok, message: ok ? "source selected (by label)" : "source option not matched" };
-    }
-    return super.selectSourceAccount(sourceAccount);
+    if (!this._isEsunApp()) return super.selectSourceAccount(sourceAccount);
+    const ok = await this._pickFromCombo(this.selectors.placeholders.source, this._rowMatcher(sourceAccount));
+    if (ok) this._selectRadio(this.selectors.modes.timing.instant);
+    return ok;
   }
 
   async selectDestinationPayee(payee) {
     assertActionAllowed("selectDestinationPayee");
-    // Always put the form in 約定 mode first (the 約定常用帳號 radio) so the
-    // designated-payee dropdown is the active 轉入帳號 input, then pick the payee.
-    // The dropdown may re-render via AJAX after the radio click, so retry briefly.
-    const clicked = this._selectRadioByText(this.selectors.modes.designated);
-    if (this._trySelectPayee(payee)) return { ok: true, message: "payee selected (約定)" };
-    if (clicked) {
-      for (let i = 0; i < 8; i++) {
-        await new Promise((r) => setTimeout(r, 120));
-        if (this._trySelectPayee(payee)) return { ok: true, message: "payee selected (約定, after wait)" };
-      }
-    }
-    return super.selectDestinationPayee(payee);
-  }
-
-  _trySelectPayee(payee) {
-    const form = this._transferForm();
-    if (!form) return false;
-    const selects = [...form.querySelectorAll("select")].filter((s) =>
-      this.selectors.labels.payee.test(this._labelTextFor(s)),
-    );
-    for (const select of selects) {
-      if (selectOptionBy(select, (opt) => this._optionMatchesAccount(opt, payee))) return true;
-    }
-    return false;
+    if (!this._isEsunApp()) return super.selectDestinationPayee(payee);
+    // Choose the designated-payee group first: it decides which rows the picker
+    // will offer at all.
+    this._selectRadio(this.selectors.modes.payeeSource.designated);
+    return this._pickFromCombo(this.selectors.placeholders.payee, this._rowMatcher(payee));
   }
 
   async fillAmount(amount) {
     assertActionAllowed("fillAmount");
-    const input = this._controlByLabel(this.selectors.labels.amount, "input");
-    if (input) {
-      setNativeValue(input, amount);
-      return { ok: true, message: "amount filled (by label)" };
-    }
-    return super.fillAmount(amount);
+    const el = this._inputByPlaceholder(this.selectors.placeholders.amount);
+    if (!el) return super.fillAmount(amount);
+    setNativeValue(el, String(amount));
+    return true;
   }
 
   async fillMemoShort(memo) {
     assertActionAllowed("fillMemoShort");
-    const input = this._controlByLabel(this.selectors.labels.memoSelf, "input");
-    if (input) {
-      setNativeValue(input, memo ?? "");
-      return { ok: true, message: "memo-to-self filled (by label)" };
-    }
-    return super.fillMemoShort(memo);
+    const el = this._inputAfterLabel(this.selectors.labels.memoSelf, this.selectors.placeholders.memo);
+    if (!el) return super.fillMemoShort(memo);
+    setNativeValue(el, memo ?? "");
+    return true;
   }
 
   async fillMemoLong(memo) {
     assertActionAllowed("fillMemoLong");
-    const input = this._controlByLabel(this.selectors.labels.memoOther, "input");
-    if (input) {
-      setNativeValue(input, memo ?? "");
-      return { ok: true, message: "memo-to-recipient filled (by label)" };
-    }
-    return super.fillMemoLong(memo);
+    const el = this._inputAfterLabel(this.selectors.labels.memoOther, this.selectors.placeholders.memo);
+    if (!el) return super.fillMemoLong(memo);
+    setNativeValue(el, memo ?? "");
+    return true;
   }
 
   async submitFormToVerificationPage() {
     assertActionAllowed("submitFormToVerificationPage");
-    // E.SUN advances 資料編輯 -> 資料確認 via a "下一步" link. This is NOT the
-    // final transfer confirmation; the 確認/送出 button lives on the 資料確認 step
-    // and is deliberately left for the user.
-    const form = this._transferForm();
-    const re = this.selectors.labels.nextLinkText;
-    const link =
-      form &&
-      [...form.querySelectorAll("a, button, input[type=submit], input[type=button]")].find((el) =>
-        re.test((el.textContent || el.value || "").trim()),
-      );
-    if (link) {
-      safeClick(link);
-      return { ok: true, message: "clicked 下一步 to 資料確認" };
-    }
-    return super.submitFormToVerificationPage();
+    if (!this._isEsunApp()) return super.submitFormToVerificationPage();
+    const { nextText } = this.selectors.submit;
+    // By text. The class btn-main-fill belongs to 立即交易 as well, and matching
+    // on it would execute a transfer from the confirm step.
+    const next = this._all("button,a[role='button'],input[type='submit']").find(
+      (e) => this._visible(e) && nextText.test(this._textOf(e) || e.value || ""),
+    );
+    if (!next) return super.submitFormToVerificationPage();
+    this._click(next);
+
+    const arrived = await this._poll(
+      () => (this.selectors.routes.verification.test(this._path()) ? true : null),
+      { timeoutMs: 15000 },
+    );
+    return !!arrived;
   }
 
-  // --- 資料確認 / 交易結果 extraction (verified table layout, no stable ids) ---
+  // --- reads ---------------------------------------------------------------
 
-  /** Current wizard step text (empty when no wizard, e.g. demo fixtures/tests). */
-  _wizardStep() {
-    const cur = this._q(this.selectors.wizard.stepCurrent);
-    return cur ? cur.textContent || "" : "";
-  }
-
-  /** Value text of the cell adjacent to a label cell matching labelRe. */
-  _confirmCellValue(labelRe) {
-    const cells = [...this.root.querySelectorAll("th,td,dt,dd")];
-    const lab = cells.find((c) => c.childElementCount === 0 && labelRe.test((c.textContent || "").trim()));
-    if (!lab) return "";
-    let v = lab.nextElementSibling;
+  /** Value cell paired with a label cell on the confirm step. */
+  _confirmValue(labelRe) {
+    const label = this._all(this.selectors.confirmStep.labelCell).find((e) =>
+      labelRe.test(this._textOf(e)),
+    );
+    if (!label) return "";
+    let v = label.nextElementSibling;
     if (!v) {
-      const row = lab.closest("tr,dl");
-      v = row && [...row.children].find((c) => c !== lab && (c.textContent || "").trim());
+      const row = label.parentElement;
+      v = row ? Array.from(row.children).find((c) => c !== label && !c.contains(label)) : null;
     }
-    return v ? (v.textContent || "").trim() : "";
+    const text = this._textOf(v);
+    return text === this.selectors.confirmStep.emptyValue ? "" : text;
   }
 
   readVerificationSummary() {
-    if (!this.selectors.wizard.verifyStepText.test(this._wizardStep())) {
+    if (!this._isEsunApp()) return super.readVerificationSummary();
+    if (!this.selectors.routes.verification.test(this._path())) {
       return super.readVerificationSummary();
     }
-    const srcVal = this._confirmCellValue(/轉出帳號/);
-    const payVal = this._confirmCellValue(/轉入帳號|收款/);
-    const amtVal = this._confirmCellValue(/轉帳金額|金額/);
-    const memoSelf = this._confirmCellValue(/給自己|摘要/);
-    const memoOther = this._confirmCellValue(/給對方|附言/);
-    // Fall back to the generic reader (demo fixtures) if this isn't the E.SUN table.
+    const srcVal = this._confirmValue(this.selectors.labels.source);
+    const payVal = this._confirmValue(this.selectors.labels.payee);
+    const amtVal = this._confirmValue(this.selectors.labels.amount);
+    const memoSelf = this._confirmValue(this.selectors.labels.memoSelf);
+    const memoOther = this._confirmValue(this.selectors.labels.memoOther);
     if (!payVal && !amtVal && !srcVal) return super.readVerificationSummary();
 
     const payeeName = (payVal.split(/[（(]|約定|玉山銀行|銀行/)[0] || "").trim();
@@ -378,118 +577,84 @@ export class EsunAdapter extends BaseBankAdapter {
     return { value, confidence: have / 3, missingFields: have === 3 ? [] : ["verification_fields"] };
   }
 
-  /** Read 可用餘額 from the current DOM (the label/value are split across nodes). */
-  _readBalanceFromDom(sourceAccount) {
-    const directText = (el) =>
-      [...el.childNodes].filter((n) => n.nodeType === 3).map((n) => n.textContent).join("").trim();
-    const el = [...this.root.querySelectorAll("span,div,td,dd,p,li")].find((e) =>
-      /可用餘額/.test(directText(e)),
-    );
-    if (el) {
-      const m = (el.textContent || "").match(/[\d,]+(?:\.\d+)?/);
-      const balance = m ? Number(m[0].replace(/,/g, "")) : NaN;
-      if (!Number.isNaN(balance)) {
-        return {
-          value: {
-            sourceAccountId: sourceAccount.id,
-            displayName: sourceAccount.label,
-            accountLast5: sourceAccount.accountLast5,
-            balance,
-            currency: CURRENCY,
-            observedAt: new Date().toISOString(),
-          },
-          confidence: 0.95,
-          missingFields: [],
-        };
-      }
-    }
-    return { value: null, confidence: 0, missingFields: ["balance_not_shown"] };
-  }
-
-  /** Select the source account and poll for the AJAX-rendered 可用餘額. */
-  async _selectSourceAndAwaitBalance(select, sourceAccount) {
-    this._selectRadioByText(this.selectors.modes.instant);
-    selectOptionBy(select, (opt) => this._optionMatchesAccount(opt, sourceAccount));
-    for (let i = 0; i < 20; i++) {
-      await new Promise((r) => setTimeout(r, 150));
-      const result = this._readBalanceFromDom(sourceAccount);
-      if (result.confidence >= 0.9) return result;
-    }
-    return null;
-  }
-
   async readBalance(sourceAccount) {
-    // E.SUN renders 可用餘額 only on the transfer form, and only AFTER a 轉出帳號 is
-    // selected. So: read it; else select the source ourselves and wait for the
-    // AJAX value; else navigate to the transfer form first and try again. This
-    // lets a batch start from any page (e.g. the account dashboard) instead of
-    // failing with account_not_found.
-    const direct = this._readBalanceFromDom(sourceAccount);
-    if (direct.confidence >= 0.9) return direct;
+    if (!this._isEsunApp()) return super.readBalance(sourceAccount);
+    const read = () => {
+      const label = this._leafByText(this.selectors.balance.label, 24);
+      if (!label) return null;
+      const scope = label.parentElement || label;
+      const m = this._textOf(scope).match(/[\d,]+(?:\.\d+)?/);
+      if (!m) return null;
+      const n = Number(m[0].replace(/,/g, ""));
+      return Number.isFinite(n) ? n : null;
+    };
 
-    let select = this._controlByLabel(this.selectors.labels.source, "select");
-    if (select) {
-      const afterSelect = await this._selectSourceAndAwaitBalance(select, sourceAccount);
-      if (afterSelect) return afterSelect;
+    const direct = read();
+    if (direct != null) {
+      return { value: { accountId: sourceAccount?.id, available: direct, currency: CURRENCY }, confidence: 0.95, missingFields: [] };
     }
 
-    // Try the generic account-row reader before navigating anywhere: a page that
-    // lists balances directly (demo fixtures, other banks) must not be navigated
-    // away from, or we'd destroy the very rows we can read.
-    const generic = await super.readBalance(sourceAccount);
-    if (generic.confidence >= 0.9) return generic;
-
-    // Still nothing and no source <select> here: we're off the transfer form
-    // (e.g. the account dashboard). Open it, wait for the form, then read.
-    if (!select) {
-      await this.navigateToTransferForm();
-      for (let i = 0; i < 30; i++) {
-        await new Promise((r) => setTimeout(r, 200));
-        select = this._controlByLabel(this.selectors.labels.source, "select");
-        if (select) break;
-      }
-      if (select) {
-        const afterNav = await this._selectSourceAndAwaitBalance(select, sourceAccount);
-        if (afterNav) return afterNav;
-      }
+    // The figure appears only on the form, and only once a source is chosen.
+    if (!this.selectors.routes.transferForm.test(this._path())) {
+      const ok = await this.navigateToTransferForm();
+      if (!ok) return super.readBalance(sourceAccount);
     }
-    return generic;
+    if (sourceAccount) await this.selectSourceAccount(sourceAccount);
+
+    const after = await this._poll(() => read(), { timeoutMs: 6000 });
+    if (after != null) {
+      return { value: { accountId: sourceAccount?.id, available: after, currency: CURRENCY }, confidence: 0.95, missingFields: [] };
+    }
+    return super.readBalance(sourceAccount);
   }
 
+  /**
+   * NOT YET VERIFIED against the live bank — the completion step has never been
+   * observed, because reaching it means making a real transfer.
+   *
+   * It fails closed on purpose. A wrong "completed" reading is the one mistake
+   * this extension must not make: the runner treats it as proof a transfer went
+   * through, and would move on to the next job. Returning low confidence stops
+   * the batch and asks the user, which is the correct behaviour for something
+   * unverified.
+   */
   readCompletion() {
-    if (!this.selectors.wizard.completeStepText.test(this._wizardStep())) {
-      return super.readCompletion();
-    }
-    // 交易結果 step. The step itself is the reliable completion signal; the
-    // reference number is best-effort until verified on a real completed transfer.
-    // Prefer specific transaction-serial labels; avoid the bare 代號 (it also
-    // matches 使用者代號). Verified 2026-07-19 on a real transfer -> a date-prefixed
-    // serial (masked e.g. 202****388).
-    const refVal = this._confirmCellValue(/交易序號|轉帳序號|交易編號|序號/) || "";
+    if (!this._isEsunApp()) return super.readCompletion();
+    const onRoute = this.selectors.routes.completion.test(this._path());
+    const generic = super.readCompletion();
+    if (!onRoute) return generic;
+
+    const body = this._textOf(this._doc.body);
+    const done = /(交易完成|交易成功|轉帳成功)/.test(body);
+    const ref = (body.match(/\b\d{6,}\b/) || [])[0];
+    if (!done) return generic;
+
     return {
       value: {
+        completed: true,
+        bankReferenceMasked: ref ? maskReference(ref) : undefined,
         pageState: PAGE_STATES.COMPLETION,
-        bankReferenceMasked: refVal ? maskReference(refVal) : undefined,
-        completionText: "交易結果",
-        completedAt: new Date().toISOString(),
       },
-      confidence: 0.9,
-      missingFields: refVal ? [] : ["bankReference"],
+      // Capped below the runner's threshold until a real transfer confirms the
+      // page's shape. Raise it only with evidence in the field notes.
+      confidence: 0.5,
+      missingFields: ["completion_unverified_after_2026_10_17_redesign"],
     };
+  }
+
+  async logout() {
+    assertActionAllowed("logout");
+    if (!this._isEsunApp()) return super.logout();
+    const { triggerText } = this.selectors.logout;
+    const el = this._all("a,button,[role='button'],div").find(
+      (e) => e.children.length === 0 && this._visible(e) && triggerText.test(this._textOf(e)),
+    );
+    if (!el) return super.logout();
+    this._click(el);
+    return true;
   }
 }
 
-// Adapter registry. Add new banks here keyed by bankId.
-export const ADAPTERS = Object.freeze({
-  esun: EsunAdapter,
-});
-
-/**
- * Build the adapter for a config's bankId.
- * @param {{bankId:string}} config
- * @param {Document|HTMLElement} [root]
- */
-export function createAdapter(config, root) {
-  const Cls = ADAPTERS[config.bankId] || EsunAdapter;
-  return new Cls({ root, config });
+export function createAdapter(opts) {
+  return new EsunAdapter(opts);
 }
