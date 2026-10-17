@@ -367,3 +367,39 @@ compares memos, and `-` is not the empty string.
 The wizard words 資料編輯 / 資料確認 are both present on this step and both carry
 class `content`, with nothing distinguishing the active one — another reason to read
 the route instead of the step text.
+
+### The account picker (probed 2026-10-17)
+
+Clicking the `readOnly` `input.combo-input` opens a dialog rather than a dropdown.
+The wrapper gains `modal-open`, and the dialog is:
+
+```
+div.combo-modal[role="dialog"]
+  div.modal-header
+  div.custom-area
+     …  li[role="button"]        ← one per account
+  div.modal-footer
+```
+
+Each row's text is the account number followed by its nickname, and the currently
+chosen row carries `class="selected"`. Six rows were present on the probed account.
+
+This is a better target than the old `<select>`: the config already stores
+`accountLast5` and `displayNamePattern`, and both appear in the row text, so the
+existing matching rules carry over unchanged. The sequence for the rewrite is
+
+1. click the trigger (locate it by its placeholder or its label, not by position),
+2. wait for `.combo-modal[role=dialog]`,
+3. pick the `li[role=button]` whose text matches the configured account,
+4. click it, then wait for the dialog to close **and** the input's value to change —
+   both, because either alone can be true while the other has not happened yet.
+
+Setting the input's `.value` directly will not work: it is `readOnly` and the app
+holds the real state.
+
+**Unknown, and it matters:** the dialog exposed no close control — the probe found
+no button, `[class*=close]`, or close-labelled element inside it. So how the adapter
+*backs out* when no row matches is unresolved. A picker that opens and cannot be
+dismissed would leave the page wedged mid-batch. Find the dismissal path (Escape,
+a click outside, a header control) before writing the selection step, and treat
+"opened the picker but found no match" as a stop that also closes the dialog.
