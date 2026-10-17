@@ -420,3 +420,39 @@ one recovery that does not depend on finding an affordance.
 > job of a batch: a transient absence read as a hard fact. Every wait against this
 > app has to poll until a deadline, and treat "not found yet" as *keep waiting*,
 > never as *not there*.
+
+### Login marker, and a session timer that can interrupt a batch
+
+`a.log_out` is gone. The signed-in signals now available:
+
+| Signal | Shape | Use |
+|---|---|---|
+| Logout control | `div.header-option-entry-button` whose text is 登出 (also `.header-option-entry-text`) | **the marker** — match the text inside the site header, not a class alone |
+| Session countdown | `div.countdown-block`, text `NNN 秒後自動登出，點擊重新計時` | corroborating, and see below |
+| Route | path begins `/esb/` | weak on its own; a logged-out SPA may still hold the route briefly |
+
+Do **not** use the `localStorage` keys (`mibKeepMe`, `custidIcon`, `nameIcon`,
+`pxsswdIcon`, `mibPlatform`) as proof of a session. They look like remembered
+preferences and would survive a logout, so they answer the wrong question.
+
+> #### The session now logs itself out, and a batch is long
+>
+> The header carries a live countdown — `NNN 秒後自動登出，點擊重新計時` — and the
+> page has a timeout dialog already in the DOM, hidden, containing 即將被登出!
+> with two buttons: **繼續使用** (`modal-default-button`) and **立即登出**
+> (`modal-second-button`).
+>
+> The real four-job batch on 2026-09-12 took about nine minutes, most of it spent
+> waiting for a person to authorise each transfer. That is well inside the range
+> where this dialog can appear mid-batch, cover the form, and make the next step
+> fail for a reason that has nothing to do with the transfer.
+>
+> Two consequences for the rewrite. The adapter must recognise the dialog and
+> stop cleanly rather than mis-read it as a broken page — note that 繼續使用 was
+> picked up as a *submit candidate* by a naive text probe on the edit page, so a
+> loose button match would click the wrong thing. And **立即登出 must never be
+> clicked**: add it beside 立即交易 in the refusal list.
+>
+> Whether the extension should press 繼續使用 to hold the session open is a design
+> question, not an obvious yes: it keeps a bank session alive on the user's
+> behalf. Left undecided here.
